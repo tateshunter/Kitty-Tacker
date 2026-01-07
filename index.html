@@ -1,1600 +1,1298 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
-import { Slider } from "@/components/ui/slider";
-import {
-  AlertTriangle,
-  Download,
-  Upload,
-  Plus,
-  Trash2,
-  PawPrint,
-  Heart,
-  Sparkles,
-  Cat,
-  Users,
-  LineChart as LineChartIcon,
-  BarChart3,
-} from "lucide-react";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-  Brush,
-  ReferenceLine,
-  BarChart,
-  Bar,
-} from "recharts";
-import { motion } from "framer-motion";
+import React, { useEffect, useRef } from "react";
 
 /**
- * Kitten Growth Tracker (cutesier + more graphs)
- * - fixed roster (no add-kitten)
- * - multiple charts: growth, daily gain, litter average, latest weights bar chart
- * - adopter assignment per kitten
- * - localStorage persistence + JSON import/export
- * - litter birthdate + live counting age ticker
+ * NOTE
+ * - This file is TSX/React so it will run in environments expecting /index.tsx.
+ * - If you're deploying to GitHub Pages as a static site, copy the HTML version into an `index.html`.
+ *   (Tell me what you’re using for deployment and I’ll give you the exact repo structure.)
  */
 
-const STORAGE_KEY = "kitten-growth-tracker:v3";
-const LITTER_BIRTHDATE_ISO = "2025-12-30";
+export default function KittenGrowthTrackerApp() {
+  const didInit = useRef(false);
 
-// --- Data extracted from your photo (oz) ---
-const seedState = {
-  unit: "oz", // "oz" or "g"
-  litterBirthDateISO: LITTER_BIRTHDATE_ISO,
-  kittens: [
-    {
-      id: "orange",
-      name: "Orange",
-      emoji: "🐱",
-      colorTag: "Orange",
-      description: "",
-      adoptionStatus: "Available",
-      adopter: { name: "", email: "", phone: "", notes: "" },
-      milestones: [],
-      notes: "",
-      weighIns: [
-        { date: "2026-01-01", valueOz: 4.88 },
-        { date: "2026-01-03", valueOz: 6.03 },
-        { date: "2026-01-05", valueOz: 7.13 },
-      ],
-    },
-    {
-      id: "blackie",
-      name: "Blackie",
-      emoji: "🐈‍⬛",
-      colorTag: "Black",
-      description: "",
-      adoptionStatus: "Available",
-      adopter: { name: "", email: "", phone: "", notes: "" },
-      milestones: [],
-      notes: "",
-      weighIns: [
-        { date: "2026-01-01", valueOz: 3.877 },
-        { date: "2026-01-03", valueOz: 5.407 },
-        { date: "2026-01-05", valueOz: 6.63 },
-      ],
-    },
-    {
-      id: "tux",
-      name: "Tux",
-      emoji: "🎩",
-      colorTag: "Tux",
-      description: "",
-      adoptionStatus: "Available",
-      adopter: { name: "", email: "", phone: "", notes: "" },
-      milestones: [],
-      notes: "",
-      weighIns: [
-        { date: "2026-01-01", valueOz: 5.255 },
-        { date: "2026-01-03", valueOz: 6.49 },
-        { date: "2026-01-05", valueOz: 7.5 },
-      ],
-    },
-    {
-      id: "tux2",
-      name: "Tux 2",
-      emoji: "🧦",
-      colorTag: "Tux",
-      description: "White stripe on left leg",
-      adoptionStatus: "Available",
-      adopter: { name: "", email: "", phone: "", notes: "" },
-      milestones: [],
-      notes: "",
-      weighIns: [
-        { date: "2026-01-01", valueOz: 5.04 },
-        { date: "2026-01-03", valueOz: 6.48 },
-        { date: "2026-01-05", valueOz: 7.17 },
-      ],
-    },
-    {
-      id: "tortie",
-      name: "Tortie",
-      emoji: "🍂",
-      colorTag: "Tortie",
-      description: "",
-      adoptionStatus: "Available",
-      adopter: { name: "", email: "", phone: "", notes: "" },
-      milestones: [],
-      notes: "",
-      weighIns: [
-        { date: "2026-01-01", valueOz: 4.38 },
-        { date: "2026-01-03", valueOz: 5.65 },
-        { date: "2026-01-05", valueOz: 7.0 },
-      ],
-    },
-    {
-      id: "calico",
-      name: "Calico",
-      emoji: "🌸",
-      colorTag: "Calico",
-      description: "",
-      adoptionStatus: "Available",
-      adopter: { name: "", email: "", phone: "", notes: "" },
-      milestones: [],
-      notes: "",
-      weighIns: [
-        { date: "2026-01-01", valueOz: 4.504 },
-        { date: "2026-01-03", valueOz: 6.1 },
-        { date: "2026-01-05", valueOz: 7.06 },
-      ],
-    },
-  ],
-  settings: {
-    expectedGainGPerDay: 10,
-    alertIfNoGainDays: 1,
-    alertIfLossPercent: 2,
-  },
-};
+  useEffect(() => {
+    // React StrictMode runs effects twice in dev; guard so we only initialize once.
+    if (didInit.current) return;
+    didInit.current = true;
 
-function clamp(n, lo, hi) {
-  return Math.max(lo, Math.min(hi, n));
-}
-
-function ozToG(oz) {
-  return oz * 28.349523125;
-}
-
-function gToOz(g) {
-  return g / 28.349523125;
-}
-
-function fmt(n, digits = 2) {
-  if (Number.isNaN(n) || n == null) return "—";
-  const d = clamp(digits, 0, 6);
-  return Number(n).toFixed(d);
-}
-
-function dayDiffISO(aISO, bISO) {
-  const a = new Date(aISO + "T00:00:00");
-  const b = new Date(bISO + "T00:00:00");
-  const ms = b.getTime() - a.getTime();
-  return Math.round(ms / (1000 * 60 * 60 * 24));
-}
-
-function msSinceISOStart(isoDate) {
-  return Date.now() - new Date(isoDate + "T00:00:00").getTime();
-}
-
-function formatAge(ms) {
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  return { days, hours, minutes, seconds };
-}
-
-function sortWeighIns(weighIns) {
-  return [...weighIns].sort((x, y) => x.date.localeCompare(y.date));
-}
-
-function latestWeighIn(weighIns) {
-  const s = sortWeighIns(weighIns);
-  return s.length ? s[s.length - 1] : null;
-}
-
-function prevWeighIn(weighIns) {
-  const s = sortWeighIns(weighIns);
-  return s.length >= 2 ? s[s.length - 2] : null;
-}
-
-function getValueInUnit(w, unit) {
-  const oz = w.valueOz;
-  return unit === "g" ? ozToG(oz) : oz;
-}
-
-function roundSmart(n, unit) {
-  if (unit === "g") return Math.round(n * 10) / 10;
-  return Math.round(n * 1000) / 1000;
-}
-
-function parseJsonSafe(text) {
-  try {
-    return { ok: true, value: JSON.parse(text) };
-  } catch (e) {
-    return { ok: false, error: String(e) };
-  }
-}
-
-function downloadText(filename, text) {
-  const blob = new Blob([text], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-function badgeForStatus(status) {
-  switch (status) {
-    case "Adopted":
-      return <Badge className="rounded-2xl">Adopted</Badge>;
-    case "Reserved":
-      return (
-        <Badge variant="secondary" className="rounded-2xl">
-          Reserved
-        </Badge>
-      );
-    default:
-      return (
-        <Badge variant="outline" className="rounded-2xl">
-          Available
-        </Badge>
-      );
-  }
-}
-
-function calcTrend(weighIns) {
-  const s = sortWeighIns(weighIns);
-  if (s.length < 2) return null;
-  const last = s[s.length - 1];
-  const prev = s[s.length - 2];
-  const days = Math.max(1, dayDiffISO(prev.date, last.date));
-  const gainOz = last.valueOz - prev.valueOz;
-  return {
-    days,
-    gainOz,
-    gainOzPerDay: gainOz / days,
-    gainGPerDay: ozToG(gainOz) / days,
-  };
-}
-
-function calcAlerts(state) {
-  const { expectedGainGPerDay, alertIfNoGainDays, alertIfLossPercent } = state.settings;
-  const alerts = [];
-
-  state.kittens.forEach((k) => {
-    const s = sortWeighIns(k.weighIns);
-    if (s.length < 2) return;
-    const last = s[s.length - 1];
-    const prev = s[s.length - 2];
-    const days = Math.max(1, dayDiffISO(prev.date, last.date));
-    const deltaOz = last.valueOz - prev.valueOz;
-    const deltaGPerDay = ozToG(deltaOz) / days;
-    const lossPct = prev.valueOz > 0 ? (-deltaOz / prev.valueOz) * 100 : 0;
-
-    if (days >= alertIfNoGainDays && deltaOz <= 0) {
-      alerts.push({
-        kittenId: k.id,
-        type: "no_gain",
-        message: `${k.name}: no gain since last weigh-in (${fmt(getValueInUnit(prev, state.unit))}${state.unit} → ${fmt(
-          getValueInUnit(last, state.unit)
-        )}${state.unit}).`,
+    const ensureScript = (src: string) =>
+      new Promise<void>((resolve, reject) => {
+        const existing = document.querySelector(`script[src="${src}"]`) as HTMLScriptElement | null;
+        if (existing) {
+          if ((window as any).Chart) resolve();
+          else existing.addEventListener("load", () => resolve(), { once: true });
+          return;
+        }
+        const s = document.createElement("script");
+        s.src = src;
+        s.async = true;
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+        document.head.appendChild(s);
       });
-    }
 
-    if (deltaOz < 0 && lossPct >= alertIfLossPercent) {
-      alerts.push({
-        kittenId: k.id,
-        type: "loss",
-        message: `${k.name}: weight dropped ~${fmt(lossPct, 1)}% since last weigh-in.`,
-      });
-    }
+    const init = async () => {
+      // Load Chart.js (CDN)
+      await ensureScript("https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js");
 
-    if (deltaOz > 0 && deltaGPerDay < expectedGainGPerDay) {
-      alerts.push({
-        kittenId: k.id,
-        type: "slow_gain",
-        message: `${k.name}: gain is ~${fmt(deltaGPerDay, 1)} g/day (flag threshold ${expectedGainGPerDay} g/day).`,
-      });
-    }
-  });
+      // ---------------------------
+      // App logic (vanilla JS inside React shell)
+      // ---------------------------
+      const STORAGE_KEY = "kitten-growth-tracker:github-pages:v1";
+      const LITTER_BIRTHDATE_ISO = "2025-12-30";
 
-  return alerts;
-}
+      // Photo data (oz)
+      const SEED = {
+        unit: "oz",
+        litterBirthDateISO: LITTER_BIRTHDATE_ISO,
+        kittens: [
+          {
+            id: "orange",
+            name: "Orange",
+            emoji: "🐱",
+            tag: "Orange",
+            description: "",
+            status: "Available",
+            adopter: { name: "", email: "", phone: "", notes: "" },
+            notes: "",
+            milestones: [],
+            weighIns: [
+              { date: "2026-01-01", oz: 4.88 },
+              { date: "2026-01-03", oz: 6.03 },
+              { date: "2026-01-05", oz: 7.13 },
+            ],
+          },
+          {
+            id: "blackie",
+            name: "Blackie",
+            emoji: "🐈‍⬛",
+            tag: "Black",
+            description: "",
+            status: "Available",
+            adopter: { name: "", email: "", phone: "", notes: "" },
+            notes: "",
+            milestones: [],
+            weighIns: [
+              { date: "2026-01-01", oz: 3.877 },
+              { date: "2026-01-03", oz: 5.407 },
+              { date: "2026-01-05", oz: 6.63 },
+            ],
+          },
+          {
+            id: "tux",
+            name: "Tux",
+            emoji: "🎩",
+            tag: "Tux",
+            description: "",
+            status: "Available",
+            adopter: { name: "", email: "", phone: "", notes: "" },
+            notes: "",
+            milestones: [],
+            weighIns: [
+              { date: "2026-01-01", oz: 5.255 },
+              { date: "2026-01-03", oz: 6.49 },
+              { date: "2026-01-05", oz: 7.5 },
+            ],
+          },
+          {
+            id: "tux2",
+            name: "Tux 2",
+            emoji: "🧦",
+            tag: "Tux",
+            description: "White stripe on left leg",
+            status: "Available",
+            adopter: { name: "", email: "", phone: "", notes: "" },
+            notes: "",
+            milestones: [],
+            weighIns: [
+              { date: "2026-01-01", oz: 5.04 },
+              { date: "2026-01-03", oz: 6.48 },
+              { date: "2026-01-05", oz: 7.17 },
+            ],
+          },
+          {
+            id: "tortie",
+            name: "Tortie",
+            emoji: "🍂",
+            tag: "Tortie",
+            description: "",
+            status: "Available",
+            adopter: { name: "", email: "", phone: "", notes: "" },
+            notes: "",
+            milestones: [],
+            weighIns: [
+              { date: "2026-01-01", oz: 4.38 },
+              { date: "2026-01-03", oz: 5.65 },
+              { date: "2026-01-05", oz: 7.0 },
+            ],
+          },
+          {
+            id: "calico",
+            name: "Calico",
+            emoji: "🌸",
+            tag: "Calico",
+            description: "",
+            status: "Available",
+            adopter: { name: "", email: "", phone: "", notes: "" },
+            notes: "",
+            milestones: [],
+            weighIns: [
+              { date: "2026-01-01", oz: 4.504 },
+              { date: "2026-01-03", oz: 6.1 },
+              { date: "2026-01-05", oz: 7.06 },
+            ],
+          },
+        ],
+      } as const;
 
-function nextISODateFromLast(weighIns) {
-  const last = latestWeighIn(weighIns);
-  if (!last) return new Date().toISOString().slice(0, 10);
-  const d = new Date(last.date + "T00:00:00");
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
-}
+      const deepClone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
 
-function movingAverage(values, windowSize) {
-  const w = Math.max(1, Math.floor(windowSize));
-  if (w <= 1) return values;
-  const out = [];
-  for (let i = 0; i < values.length; i++) {
-    let sum = 0;
-    let count = 0;
-    for (let j = i - (w - 1); j <= i; j++) {
-      if (j >= 0 && values[j] != null) {
-        sum += values[j];
-        count++;
-      }
-    }
-    out.push(count ? sum / count : null);
-  }
-  return out;
-}
+      const sortWeighIns = (ws: any[]) => [...ws].sort((a, b) => String(a.date).localeCompare(String(b.date)));
 
-function buildUnifiedDates(state) {
-  const allDates = new Set();
-  state.kittens.forEach((k) => k.weighIns.forEach((w) => allDates.add(w.date)));
-  return [...allDates].sort();
-}
-
-function buildGrowthChartData(state, opts) {
-  const { normalizeToFirst, smoothingPoints, litterBirthDateISO } = opts;
-  const dates = buildUnifiedDates(state);
-
-  const seriesByKitten = new Map();
-  state.kittens.forEach((k) => {
-    const map = new Map(k.weighIns.map((w) => [w.date, w]));
-    const vals = dates.map((d) => {
-      const w = map.get(d);
-      return w ? roundSmart(getValueInUnit(w, state.unit), state.unit) : null;
-    });
-
-    const firstNonNull = vals.find((v) => v != null);
-    const normalized =
-      normalizeToFirst && firstNonNull != null
-        ? vals.map((v) => (v == null ? null : v - firstNonNull))
-        : vals;
-
-    const smoothed = smoothingPoints > 1 ? movingAverage(normalized, smoothingPoints) : normalized;
-    seriesByKitten.set(k.id, smoothed);
-  });
-
-  return dates.map((date, idx) => {
-    const ageDays = Math.max(0, dayDiffISO(litterBirthDateISO, date));
-    const row = { date, ageDays };
-    state.kittens.forEach((k) => {
-      row[k.id] = seriesByKitten.get(k.id)?.[idx] ?? null;
-    });
-    return row;
-  });
-}
-
-function buildDailyGainChartData(state, opts) {
-  const { normalizeUnit, litterBirthDateISO } = opts;
-  const dates = buildUnifiedDates(state);
-  const rows = dates.map((date) => ({
-    date,
-    ageDays: Math.max(0, dayDiffISO(litterBirthDateISO, date)),
-  }));
-
-  state.kittens.forEach((k) => {
-    const m = new Map(k.weighIns.map((w) => [w.date, w]));
-    let prevDate = null;
-    let prevValOz = null;
-
-    dates.forEach((d, idx) => {
-      const w = m.get(d);
-      if (!w) {
-        rows[idx][k.id] = null;
-        return;
-      }
-      if (prevDate == null) {
-        rows[idx][k.id] = null;
-        prevDate = d;
-        prevValOz = w.valueOz;
-        return;
-      }
-      const days = Math.max(1, dayDiffISO(prevDate, d));
-      const deltaOz = w.valueOz - prevValOz;
-      const perDayOz = deltaOz / days;
-      const perDay = normalizeUnit === "g" ? ozToG(perDayOz) : perDayOz;
-      rows[idx][k.id] = roundSmart(perDay, normalizeUnit);
-      prevDate = d;
-      prevValOz = w.valueOz;
-    });
-  });
-
-  return rows;
-}
-
-function buildLitterAverageChartData(state, opts) {
-  const { litterBirthDateISO, smoothingPoints } = opts;
-  const dates = buildUnifiedDates(state);
-
-  const avgValues = dates.map((d) => {
-    const vals = state.kittens
-      .map((k) => k.weighIns.find((w) => w.date === d))
-      .filter(Boolean)
-      .map((w) => getValueInUnit(w, state.unit));
-    if (!vals.length) return null;
-    return vals.reduce((a, b) => a + b, 0) / vals.length;
-  });
-
-  const smoothed = smoothingPoints > 1 ? movingAverage(avgValues, smoothingPoints) : avgValues;
-
-  return dates.map((date, idx) => ({
-    date,
-    ageDays: Math.max(0, dayDiffISO(litterBirthDateISO, date)),
-    avg: smoothed[idx] == null ? null : roundSmart(smoothed[idx], state.unit),
-    count: state.kittens.filter((k) => k.weighIns.some((w) => w.date === date)).length,
-  }));
-}
-
-function buildLatestWeightsBarData(state) {
-  return state.kittens
-    .map((k) => {
-      const last = latestWeighIn(k.weighIns);
-      return {
-        id: k.id,
-        name: k.name,
-        emoji: k.emoji || "🐾",
-        value: last ? roundSmart(getValueInUnit(last, state.unit), state.unit) : null,
-        date: last?.date || null,
+      const loadState = () => {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return deepClone(SEED);
+          const incoming = JSON.parse(raw);
+          const merged: any = deepClone(SEED);
+          if (incoming && typeof incoming === "object") {
+            merged.unit = incoming.unit === "g" ? "g" : "oz";
+            merged.litterBirthDateISO = incoming.litterBirthDateISO || merged.litterBirthDateISO;
+            const byId = new Map((incoming.kittens || []).map((k: any) => [k.id, k]));
+            merged.kittens = merged.kittens.map((k: any) => {
+              const inc = byId.get(k.id);
+              if (!inc) return k;
+              return {
+                ...k,
+                ...inc,
+                id: k.id,
+                adopter: { ...k.adopter, ...(inc.adopter || {}) },
+                weighIns: sortWeighIns(Array.isArray(inc.weighIns) ? inc.weighIns : k.weighIns),
+                milestones: Array.isArray(inc.milestones) ? inc.milestones : k.milestones || [],
+              };
+            });
+          }
+          return merged;
+        } catch {
+          return deepClone(SEED);
+        }
       };
-    })
-    .sort((a, b) => (b.value ?? -Infinity) - (a.value ?? -Infinity));
-}
 
-function useInterval(callback, delay) {
-  const saved = useRef(callback);
-  useEffect(() => {
-    saved.current = callback;
-  }, [callback]);
-  useEffect(() => {
-    if (delay == null) return;
-    const id = setInterval(() => saved.current?.(), delay);
-    return () => clearInterval(id);
-  }, [delay]);
-}
+      let state: any = loadState();
+      let selectedId: string = state.kittens[0]?.id || "orange";
 
-function CuteBackdrop() {
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-foreground/5 blur-3xl" />
-      <div className="absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-foreground/5 blur-3xl" />
-      <div className="absolute left-1/2 top-0 h-56 w-56 -translate-x-1/2 rounded-full bg-foreground/5 blur-3xl" />
-
-      {/* floating pawprints */}
-      <div className="absolute left-6 top-10 rotate-[-18deg] opacity-10">
-        <PawPrint className="h-10 w-10" />
-      </div>
-      <div className="absolute right-10 top-28 rotate-[14deg] opacity-10">
-        <PawPrint className="h-8 w-8" />
-      </div>
-      <div className="absolute bottom-10 left-1/3 rotate-[8deg] opacity-10">
-        <PawPrint className="h-9 w-9" />
-      </div>
-    </div>
-  );
-}
-
-function Pill({ children }) {
-  return <span className="inline-flex items-center gap-1 rounded-full border bg-background/60 px-3 py-1 text-xs">{children}</span>;
-}
-
-export default function KittenGrowthTracker() {
-  const [state, setState] = useState(() => {
-    const raw = typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEY) : null;
-    if (!raw) return seedState;
-    const parsed = parseJsonSafe(raw);
-    if (!parsed.ok) return seedState;
-
-    // Merge to ensure new fields (emoji/adopter) exist, fixed roster only.
-    const incoming = parsed.value || {};
-    const incomingById = new Map((incoming.kittens || []).map((k) => [k.id, k]));
-    const mergedKittens = seedState.kittens.map((k) => {
-      const inc = incomingById.get(k.id);
-      if (!inc) return k;
-      return {
-        ...k,
-        ...inc,
-        id: k.id,
-        name: inc.name ?? k.name,
-        emoji: inc.emoji ?? k.emoji,
-        adopter: { ...k.adopter, ...(inc.adopter || {}) },
-        weighIns: sortWeighIns(Array.isArray(inc.weighIns) ? inc.weighIns : k.weighIns),
-        milestones: Array.isArray(inc.milestones) ? inc.milestones : k.milestones,
+      const saveState = () => {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch {
+          // ignore
+        }
       };
-    });
 
-    return {
-      ...seedState,
-      ...incoming,
-      litterBirthDateISO: incoming.litterBirthDateISO || seedState.litterBirthDateISO,
-      kittens: mergedKittens,
-      settings: { ...seedState.settings, ...(incoming.settings || {}) },
-    };
-  });
+      // ---------------------------
+      // Utilities
+      // ---------------------------
+      const ozToG = (oz: number) => oz * 28.349523125;
+      const gToOz = (g: number) => g / 28.349523125;
 
-  const [selectedKittenId, setSelectedKittenId] = useState(seedState.kittens[0]?.id || "");
-  const [search, setSearch] = useState("");
+      const fmt = (n: any, digits: number) => {
+        if (n == null || Number.isNaN(n)) return "—";
+        const d = Math.max(0, Math.min(6, digits ?? 2));
+        return Number(n).toFixed(d);
+      };
 
-  // Chart controls
-  const [showAllLines, setShowAllLines] = useState(true);
-  const [normalizeToFirst, setNormalizeToFirst] = useState(false);
-  const [showAgeAxis, setShowAgeAxis] = useState(true);
-  const [smoothingPoints, setSmoothingPoints] = useState(1);
+      const dayDiffISO = (aISO: string, bISO: string) => {
+        const a = new Date(aISO + "T00:00:00");
+        const b = new Date(bISO + "T00:00:00");
+        return Math.round((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24));
+      };
 
-  // Live litter age ticker
-  const [ageTick, setAgeTick] = useState(() => msSinceISOStart(state.litterBirthDateISO));
-  useInterval(() => setAgeTick(msSinceISOStart(state.litterBirthDateISO)), 1000);
+      const msSinceISOStart = (iso: string) => Date.now() - new Date(iso + "T00:00:00").getTime();
 
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      // ignore
-    }
-  }, [state]);
+      const formatAge = (ms: number) => {
+        const s = Math.max(0, Math.floor(ms / 1000));
+        const days = Math.floor(s / 86400);
+        const hrs = Math.floor((s % 86400) / 3600);
+        const mins = Math.floor((s % 3600) / 60);
+        const secs = s % 60;
+        return { days, hrs, mins, secs };
+      };
 
-  const selectedKitten = useMemo(
-    () => state.kittens.find((k) => k.id === selectedKittenId) || state.kittens[0],
-    [state.kittens, selectedKittenId]
-  );
+      const allDates = () => {
+        const set = new Set<string>();
+        state.kittens.forEach((k: any) => (k.weighIns || []).forEach((w: any) => set.add(w.date)));
+        return Array.from(set).sort();
+      };
 
-  const growthChartData = useMemo(
-    () =>
-      buildGrowthChartData(state, {
-        normalizeToFirst,
-        smoothingPoints,
-        litterBirthDateISO: state.litterBirthDateISO,
-      }),
-    [state, normalizeToFirst, smoothingPoints]
-  );
+      const getVal = (w: any) => {
+        if (!w) return null;
+        return state.unit === "g" ? ozToG(w.oz) : w.oz;
+      };
 
-  const gainChartUnit = state.unit === "g" ? "g" : "oz";
-  const dailyGainChartData = useMemo(
-    () =>
-      buildDailyGainChartData(state, {
-        normalizeUnit: gainChartUnit,
-        litterBirthDateISO: state.litterBirthDateISO,
-      }),
-    [state, gainChartUnit]
-  );
+      const ensureAdopter = (k: any) => {
+        if (!k.adopter) k.adopter = { name: "", email: "", phone: "", notes: "" };
+        return k;
+      };
 
-  const litterAverageData = useMemo(
-    () =>
-      buildLitterAverageChartData(state, {
-        litterBirthDateISO: state.litterBirthDateISO,
-        smoothingPoints,
-      }),
-    [state, smoothingPoints]
-  );
+      const latestWeighIn = (k: any) => {
+        const s = sortWeighIns(k.weighIns || []);
+        return s.length ? s[s.length - 1] : null;
+      };
 
-  const latestWeightsData = useMemo(() => buildLatestWeightsBarData(state), [state]);
+      const prevWeighIn = (k: any) => {
+        const s = sortWeighIns(k.weighIns || []);
+        return s.length >= 2 ? s[s.length - 2] : null;
+      };
 
-  const alerts = useMemo(() => calcAlerts(state), [state]);
+      const kittenMatches = (k: any, q: string) => {
+        if (!q) return true;
+        const t = q.toLowerCase();
+        return [k.name, k.tag, k.description, k.status, k.adopter?.name]
+          .some((v) => String(v || "").toLowerCase().includes(t));
+      };
 
-  const filteredKittens = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return state.kittens;
-    return state.kittens.filter((k) => {
-      return (
-        k.name.toLowerCase().includes(q) ||
-        (k.description || "").toLowerCase().includes(q) ||
-        (k.colorTag || "").toLowerCase().includes(q) ||
-        (k.adopter?.name || "").toLowerCase().includes(q)
-      );
-    });
-  }, [state.kittens, search]);
+      const statusBadge = (status: string) => {
+        const s = status || "Available";
+        const cls = s === "Adopted" ? "adpt" : s === "Reserved" ? "resv" : "avail";
+        return `<span class="badge ${cls}">${s}</span>`;
+      };
 
-  function setUnit(unit) {
-    setState((s) => ({ ...s, unit }));
-  }
+      // ---------------------------
+      // DOM refs
+      // ---------------------------
+      const bornDateEl = document.getElementById("bornDate");
+      const ageTickerEl = document.getElementById("ageTicker");
+      const unitSelect = document.getElementById("unitSelect") as HTMLSelectElement | null;
+      const allToggle = document.getElementById("allToggle") as HTMLInputElement | null;
+      const normalizeToggle = document.getElementById("normalizeToggle") as HTMLInputElement | null;
+      const kittensList = document.getElementById("kittensList");
+      const searchInput = document.getElementById("searchInput") as HTMLInputElement | null;
+      const selectedPanel = document.getElementById("selectedPanel");
+      const selectedSub = document.getElementById("selectedSub");
+      const selectedNamePill = document.getElementById("selectedNamePill");
+      const exportBtn = document.getElementById("exportBtn");
+      const importFile = document.getElementById("importFile") as HTMLInputElement | null;
+      const resetBtn = document.getElementById("resetBtn");
+      const addWeighBtn = document.getElementById("addWeighBtn");
 
-  function addWeighIn(kittenId, dateISO, value, unit) {
-    if (!dateISO) return;
-    const num = Number(value);
-    if (!Number.isFinite(num)) return;
-    const valueOz = unit === "g" ? gToOz(num) : num;
+      const weighDialog = document.getElementById("weighDialog") as HTMLDialogElement | null;
+      const weighDate = document.getElementById("weighDate") as HTMLInputElement | null;
+      const weighValue = document.getElementById("weighValue") as HTMLInputElement | null;
+      const weighUnit = document.getElementById("weighUnit");
 
-    setState((s) => ({
-      ...s,
-      kittens: s.kittens.map((k) => {
-        if (k.id !== kittenId) return k;
-        const existing = k.weighIns.find((w) => w.date === dateISO);
-        const next = existing
-          ? k.weighIns.map((w) => (w.date === dateISO ? { ...w, valueOz } : w))
-          : [...k.weighIns, { date: dateISO, valueOz }];
-        return { ...k, weighIns: sortWeighIns(next) };
-      }),
-    }));
-  }
+      const tabButtons = Array.from(document.querySelectorAll(".tabbtn"));
+      const wraps: Record<string, HTMLElement | null> = {
+        growth: document.getElementById("wrap-growth"),
+        gain: document.getElementById("wrap-gain"),
+        avg: document.getElementById("wrap-avg"),
+        latest: document.getElementById("wrap-latest"),
+      };
 
-  function deleteWeighIn(kittenId, dateISO) {
-    setState((s) => ({
-      ...s,
-      kittens: s.kittens.map((k) => {
-        if (k.id !== kittenId) return k;
-        return { ...k, weighIns: k.weighIns.filter((w) => w.date !== dateISO) };
-      }),
-    }));
-  }
-
-  function upsertKitten(kitten) {
-    setState((s) => ({
-      ...s,
-      kittens: s.kittens.map((k) => (k.id === kitten.id ? kitten : k)),
-    }));
-  }
-
-  function exportData() {
-    downloadText(
-      `kitten-growth-tracker-${new Date().toISOString().slice(0, 10)}.json`,
-      JSON.stringify(state, null, 2)
-    );
-  }
-
-  function importData(file) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const text = String(reader.result || "");
-      const parsed = parseJsonSafe(text);
-      if (!parsed.ok) {
-        alert(`Could not import JSON: ${parsed.error}`);
+      if (!bornDateEl || !ageTickerEl || !unitSelect || !allToggle || !normalizeToggle || !kittensList || !searchInput || !selectedPanel || !selectedSub || !selectedNamePill || !exportBtn || !importFile || !resetBtn || !addWeighBtn || !weighDialog || !weighDate || !weighValue || !weighUnit) {
+        // If the host environment changed the DOM, fail loudly with a helpful message.
+        // eslint-disable-next-line no-console
+        console.error("Kitten tracker: missing required DOM nodes. Did the markup change?");
         return;
       }
 
-      const incoming = parsed.value || {};
-      const incomingById = new Map((incoming.kittens || []).map((k) => [k.id, k]));
+      // ---------------------------
+      // Charts
+      // ---------------------------
+      const Chart = (window as any).Chart;
+      const palette: Record<string, string> = {
+        orange: "#ff8a3d",
+        blackie: "#2f3542",
+        tux: "#4b5563",
+        tux2: "#64748b",
+        tortie: "#b45309",
+        calico: "#db2777",
+      };
 
-      const mergedKittens = seedState.kittens.map((k) => {
-        const inc = incomingById.get(k.id);
-        if (!inc) return k;
-        return {
-          ...k,
-          ...inc,
-          id: k.id,
-          name: inc.name ?? k.name,
-          emoji: inc.emoji ?? k.emoji,
-          adopter: { ...k.adopter, ...(inc.adopter || {}) },
-          weighIns: sortWeighIns(Array.isArray(inc.weighIns) ? inc.weighIns : k.weighIns),
-          milestones: Array.isArray(inc.milestones) ? inc.milestones : k.milestones,
-        };
-      });
+      let chartGrowth: any, chartGain: any, chartAvg: any, chartLatest: any;
 
-      setState({
-        ...seedState,
-        ...incoming,
-        litterBirthDateISO: incoming.litterBirthDateISO || seedState.litterBirthDateISO,
-        kittens: mergedKittens,
-        settings: { ...seedState.settings, ...(incoming.settings || {}) },
-      });
-    };
-    reader.readAsText(file);
-  }
+      const getVisibleKittens = () => {
+        const all = allToggle.checked;
+        return all ? state.kittens : state.kittens.filter((k: any) => k.id === selectedId);
+      };
 
-  const summary = useMemo(() => {
-    return state.kittens
-      .map((k) => {
-        const last = latestWeighIn(k.weighIns);
-        const prev = prevWeighIn(k.weighIns);
-        const trend = calcTrend(k.weighIns);
-        const lastVal = last ? getValueInUnit(last, state.unit) : null;
-        const prevVal = prev ? getValueInUnit(prev, state.unit) : null;
-        const delta = last && prev ? lastVal - prevVal : null;
-        const deltaPerDay = trend ? (state.unit === "g" ? trend.gainGPerDay : trend.gainOzPerDay) : null;
+      const buildGrowthData = () => {
+        const dates = allDates();
+        const labels = dates.map((d) => {
+          const ageDays = Math.max(0, dayDiffISO(state.litterBirthDateISO, d));
+          return `${d} (day ${ageDays})`;
+        });
+
+        const normalize = normalizeToggle.checked;
+        const datasets = getVisibleKittens().map((k: any) => {
+          const map = new Map((k.weighIns || []).map((w: any) => [w.date, w]));
+          const vals = dates.map((d) => {
+            const w = map.get(d);
+            return w ? getVal(w) : null;
+          });
+          const first = vals.find((v) => v != null);
+          const y = normalize && first != null ? vals.map((v) => (v == null ? null : v - first)) : vals;
+
+          return {
+            label: `${k.emoji || "🐾"} ${k.name}`,
+            data: y,
+            borderColor: palette[k.id] || "#111827",
+            backgroundColor: palette[k.id] || "#111827",
+            borderWidth: k.id === selectedId ? 3 : 2,
+            pointRadius: k.id === selectedId ? 4 : 3,
+            pointHoverRadius: 5,
+            tension: 0.25,
+            spanGaps: true,
+          };
+        });
+
+        const yLabel = normalize ? `Δ weight (${state.unit})` : `Weight (${state.unit})`;
+        return { labels, datasets, yLabel };
+      };
+
+      const buildGainData = () => {
+        const dates = allDates();
+        const labels = dates.map((d) => {
+          const ageDays = Math.max(0, dayDiffISO(state.litterBirthDateISO, d));
+          return `${d} (day ${ageDays})`;
+        });
+
+        const datasets = getVisibleKittens().map((k: any) => {
+          const s = sortWeighIns(k.weighIns || []);
+          const byDate = new Map(s.map((w: any) => [w.date, w]));
+
+          let prevDate: string | null = null;
+          let prevOz: number | null = null;
+
+          const data = dates.map((d) => {
+            const w = byDate.get(d);
+            if (!w) return null;
+            if (prevDate == null || prevOz == null) {
+              prevDate = d;
+              prevOz = w.oz;
+              return null;
+            }
+            const days = Math.max(1, dayDiffISO(prevDate, d));
+            const perDayOz = (w.oz - prevOz) / days;
+            prevDate = d;
+            prevOz = w.oz;
+            return state.unit === "g" ? ozToG(perDayOz) : perDayOz;
+          });
+
+          return {
+            label: `${k.emoji || "🐾"} ${k.name}`,
+            data,
+            borderColor: palette[k.id] || "#111827",
+            backgroundColor: palette[k.id] || "#111827",
+            borderWidth: k.id === selectedId ? 3 : 2,
+            pointRadius: 0,
+            tension: 0.25,
+            spanGaps: true,
+          };
+        });
+
+        return { labels, datasets, yLabel: `${state.unit}/day` };
+      };
+
+      const buildAvgData = () => {
+        const dates = allDates();
+        const labels = dates.map((d) => {
+          const ageDays = Math.max(0, dayDiffISO(state.litterBirthDateISO, d));
+          return `${d} (day ${ageDays})`;
+        });
+
+        const data = dates.map((d) => {
+          const vals = state.kittens
+            .map((k: any) => (k.weighIns || []).find((w: any) => w.date === d))
+            .filter(Boolean)
+            .map((w: any) => getVal(w));
+          if (!vals.length) return null;
+          return vals.reduce((a: number, b: number) => a + b, 0) / vals.length;
+        });
 
         return {
-          id: k.id,
-          name: k.name,
-          emoji: k.emoji || "🐾",
-          status: k.adoptionStatus,
-          adopterName: k.adopter?.name || "",
-          lastDate: last?.date || null,
-          lastValue: lastVal,
-          delta,
-          deltaPerDay,
+          labels,
+          datasets: [
+            {
+              label: "✨ Litter average",
+              data,
+              borderColor: "#7c3aed",
+              backgroundColor: "#7c3aed",
+              borderWidth: 3,
+              pointRadius: 3,
+              tension: 0.25,
+              spanGaps: true,
+            },
+          ],
+          yLabel: `Avg (${state.unit})`,
         };
-      })
-      .sort((a, b) => (b.lastDate || "").localeCompare(a.lastDate || ""));
-  }, [state.kittens, state.unit]);
+      };
 
-  const unitLabel = state.unit === "g" ? "g" : "oz";
-  const liveAge = useMemo(() => formatAge(ageTick), [ageTick]);
+      const buildLatestData = () => {
+        const rows = state.kittens
+          .map((k: any) => {
+            const last = latestWeighIn(k);
+            return {
+              name: `${k.emoji || "🐾"} ${k.name}`,
+              value: last ? getVal(last) : null,
+              date: last?.date || "",
+            };
+          })
+          .sort((a: any, b: any) => (b.value ?? -Infinity) - (a.value ?? -Infinity));
 
-  const reservedCount = state.kittens.filter((k) => k.adoptionStatus === "Reserved").length;
-  const adoptedCount = state.kittens.filter((k) => k.adoptionStatus === "Adopted").length;
+        return {
+          labels: rows.map((r: any) => r.name),
+          datasets: [
+            {
+              label: `Latest weight (${state.unit})`,
+              data: rows.map((r: any) => r.value),
+              backgroundColor: rows.map((_: any, i: number) => ["#ff8a3d", "#db2777", "#7c3aed", "#0ea5e9", "#10b981", "#111827"][i % 6]),
+              borderRadius: 12,
+            },
+          ],
+          yLabel: `${state.unit}`,
+        };
+      };
+
+      const makeChart = (canvas: HTMLCanvasElement, type: any, dataBuilder: any) => {
+        const built = dataBuilder();
+        return new Chart(canvas, {
+          type,
+          data: { labels: built.labels, datasets: built.datasets },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { labels: { boxWidth: 14, boxHeight: 14, font: { family: "Nunito" } } },
+              tooltip: {
+                callbacks: {
+                  label: (item: any) => {
+                    const v = item.raw;
+                    if (v == null) return `${item.dataset.label}: —`;
+                    const digits = state.unit === "g" ? 1 : 3;
+                    return `${item.dataset.label}: ${fmt(v, digits)} ${built.yLabel.includes("/day") ? state.unit + "/day" : state.unit}`;
+                  },
+                },
+              },
+            },
+            scales: {
+              x: {
+                ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
+                grid: { color: "rgba(31,36,48,.06)" },
+              },
+              y: {
+                title: { display: true, text: built.yLabel, font: { family: "Nunito", weight: "700" } },
+                grid: { color: "rgba(31,36,48,.06)" },
+              },
+            },
+          },
+        });
+      };
+
+      const rebuildCharts = () => {
+        if (chartGrowth) chartGrowth.destroy();
+        if (chartGain) chartGain.destroy();
+        if (chartAvg) chartAvg.destroy();
+        if (chartLatest) chartLatest.destroy();
+
+        const c1 = document.getElementById("chartGrowth") as HTMLCanvasElement;
+        const c2 = document.getElementById("chartGain") as HTMLCanvasElement;
+        const c3 = document.getElementById("chartAvg") as HTMLCanvasElement;
+        const c4 = document.getElementById("chartLatest") as HTMLCanvasElement;
+
+        chartGrowth = makeChart(c1, "line", buildGrowthData);
+        chartGain = makeChart(c2, "line", buildGainData);
+        chartAvg = makeChart(c3, "line", buildAvgData);
+        chartLatest = makeChart(c4, "bar", buildLatestData);
+      };
+
+      // ---------------------------
+      // Rendering helpers
+      // ---------------------------
+      const escapeHtml = (str: any) =>
+        String(str || "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+
+      const renderRoster = () => {
+        const q = (searchInput.value || "").trim();
+        const list = state.kittens.filter((k: any) => kittenMatches(k, q));
+
+        kittensList.innerHTML = list
+          .map((k: any) => {
+            ensureAdopter(k);
+            const last = latestWeighIn(k);
+            const prev = prevWeighIn(k);
+            const lastV = last ? getVal(last) : null;
+            const prevV = prev ? getVal(prev) : null;
+            const delta = last && prev ? lastV - prevV : null;
+            const digits = state.unit === "g" ? 1 : 3;
+            const deltaText = delta == null ? "" : `${delta >= 0 ? "+" : ""}${fmt(delta, digits)} ${state.unit}`;
+
+            return `
+              <div class="krow ${k.id === selectedId ? "active" : ""}" data-id="${k.id}">
+                <div>
+                  <div class="kname">
+                    <div class="emoji">${k.emoji || "🐾"}</div>
+                    <div>
+                      <div style="font-weight: 900;">${escapeHtml(k.name)}</div>
+                      <div class="kmeta">${escapeHtml(k.description ? k.description : k.tag || "")} ${
+                        k.adopter?.name && k.status !== "Available" ? `• adopter: ${escapeHtml(k.adopter.name)}` : ""
+                      }</div>
+                    </div>
+                  </div>
+                </div>
+                <div style="text-align:right; min-width: 120px;">
+                  <div>${statusBadge(k.status)}</div>
+                  <div class="kmeta" style="margin-top:4px;">
+                    ${last ? `${fmt(lastV, digits)} ${state.unit}` : "—"}
+                    ${deltaText ? `<span class="kmeta"> • ${deltaText}</span>` : ""}
+                  </div>
+                </div>
+              </div>
+            `;
+          })
+          .join("");
+
+        Array.from(kittensList.querySelectorAll(".krow")).forEach((el) => {
+          el.addEventListener("click", () => {
+            selectedId = (el as HTMLElement).getAttribute("data-id") || selectedId;
+            renderAll();
+          });
+        });
+      };
+
+      const renderSelected = () => {
+        const k = state.kittens.find((x: any) => x.id === selectedId) || state.kittens[0];
+        ensureAdopter(k);
+
+        selectedNamePill.textContent = `${k.emoji || "🐾"} ${k.name}`;
+        selectedSub.textContent = `${k.tag || ""}${k.description ? " • " + k.description : ""}`.trim() || "—";
+
+        const last = latestWeighIn(k);
+        const prev = prevWeighIn(k);
+        const lastV = last ? getVal(last) : null;
+        const prevV = prev ? getVal(prev) : null;
+        const digits = state.unit === "g" ? 1 : 3;
+
+        const ageDays = last ? Math.max(0, dayDiffISO(state.litterBirthDateISO, last.date)) : null;
+        const delta = last && prev ? lastV - prevV : null;
+        const daysBetween = last && prev ? Math.max(1, dayDiffISO(prev.date, last.date)) : null;
+        const deltaPerDay = delta != null && daysBetween != null ? delta / daysBetween : null;
+
+        const adopterEnabled = k.status === "Reserved" || k.status === "Adopted";
+
+        const weighRows = sortWeighIns(k.weighIns || [])
+          .map((w: any) => {
+            const v = getVal(w);
+            const ad = Math.max(0, dayDiffISO(state.litterBirthDateISO, w.date));
+            return `
+              <tr>
+                <td>${w.date}</td>
+                <td>${ad}</td>
+                <td>${fmt(v, digits)} ${state.unit}</td>
+                <td style="text-align:right;"><button class="btn" data-del="${w.date}" title="Delete weigh-in">🗑️</button></td>
+              </tr>
+            `;
+          })
+          .join("");
+
+        selectedPanel.innerHTML = `
+          <div class="kheader">
+            <div class="row" style="align-items:center;">
+              <div class="bigEmoji">${k.emoji || "🐾"}</div>
+              <div>
+                <div style="font-family: Fredoka, Nunito; font-size: 18px; font-weight: 600;">${escapeHtml(k.name)}</div>
+                <div class="small">${statusBadge(k.status)} <span style="margin-left:8px;">tag: ${escapeHtml(k.tag || "—")}</span></div>
+              </div>
+            </div>
+            <div class="row">
+              <button class="btn" id="focusOnlyBtn" title="Show only this kitten in charts">🎯 Focus charts</button>
+              <button class="btn" id="showAllBtn" title="Show all kittens in charts">🧺 Show all</button>
+            </div>
+          </div>
+
+          <div class="statRow" style="margin-top: 12px;">
+            <div class="stat"><div class="t">Latest weight</div><div class="v">${lastV == null ? "—" : fmt(lastV, digits)} ${state.unit}</div><div class="s">${last?.date || ""}</div></div>
+            <div class="stat"><div class="t">Age at latest</div><div class="v">${ageDays == null ? "—" : ageDays} days</div><div class="s">born ${state.litterBirthDateISO}</div></div>
+            <div class="stat"><div class="t">Change since last</div><div class="v">${delta == null ? "—" : `${delta >= 0 ? "+" : ""}${fmt(delta, digits)} ${state.unit}`}</div><div class="s">${prev ? `${prev.date} → ${last?.date || ""}` : ""}</div></div>
+            <div class="stat"><div class="t">Avg / day</div><div class="v">${deltaPerDay == null ? "—" : fmt(deltaPerDay, state.unit === "g" ? 1 : 3)} ${state.unit}/day</div><div class="s">(last interval)</div></div>
+          </div>
+
+          <div class="two" style="margin-top: 14px;">
+            <div class="card" style="box-shadow:none; background: rgba(255,255,255,.55);">
+              <div class="head" style="border-bottom:none;"><div><h2>Profile</h2><div class="small">Name / emoji / status</div></div></div>
+              <div class="body">
+                <div class="two">
+                  <div>
+                    <label>Name</label>
+                    <input id="k_name" value="${escapeHtml(k.name)}" />
+                  </div>
+                  <div>
+                    <label>Emoji</label>
+                    <input id="k_emoji" value="${escapeHtml(k.emoji || "")}" placeholder="🐱" />
+                  </div>
+                  <div>
+                    <label>Status</label>
+                    <select id="k_status">
+                      <option value="Available" ${k.status === "Available" ? "selected" : ""}>Available</option>
+                      <option value="Reserved" ${k.status === "Reserved" ? "selected" : ""}>Reserved</option>
+                      <option value="Adopted" ${k.status === "Adopted" ? "selected" : ""}>Adopted</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label>Tag</label>
+                    <input id="k_tag" value="${escapeHtml(k.tag || "")}" placeholder="Calico / Tux / Orange…" />
+                  </div>
+                </div>
+                <div style="margin-top: 10px;">
+                  <label>Description</label>
+                  <textarea id="k_desc" placeholder="White stripe on left leg…">${escapeHtml(k.description || "")}</textarea>
+                </div>
+                <div style="margin-top: 10px; display:flex; justify-content:flex-end;">
+                  <button class="btn pink" id="saveProfileBtn">💾 Save profile</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="card" style="box-shadow:none; background: rgba(255,255,255,.55);">
+              <div class="head" style="border-bottom:none;"><div><h2>Adopter</h2><div class="small">Enable by setting status to Reserved or Adopted</div></div></div>
+              <div class="body">
+                <div class="hint">Adopter fields are ${adopterEnabled ? "enabled ✅" : "disabled until Reserved/Adopted 💤"}.</div>
+                <div class="two" style="margin-top: 10px;">
+                  <div>
+                    <label>Adopter name</label>
+                    <input id="a_name" value="${escapeHtml(k.adopter.name || "")}" ${adopterEnabled ? "" : "disabled"} />
+                  </div>
+                  <div>
+                    <label>Email</label>
+                    <input id="a_email" value="${escapeHtml(k.adopter.email || "")}" ${adopterEnabled ? "" : "disabled"} />
+                  </div>
+                  <div>
+                    <label>Phone</label>
+                    <input id="a_phone" value="${escapeHtml(k.adopter.phone || "")}" ${adopterEnabled ? "" : "disabled"} />
+                  </div>
+                  <div style="grid-column:1/-1;">
+                    <label>Notes</label>
+                    <textarea id="a_notes" ${adopterEnabled ? "" : "disabled"} placeholder="Meetup preferences, home notes, gotcha-day plan…">${escapeHtml(k.adopter.notes || "")}</textarea>
+                  </div>
+                </div>
+                <div style="margin-top: 10px; display:flex; justify-content:flex-end;">
+                  <button class="btn pink" id="saveAdopterBtn" ${adopterEnabled ? "" : "disabled"}>💖 Save adopter</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="two" style="margin-top: 14px;">
+            <div class="card" style="box-shadow:none; background: rgba(255,255,255,.55);">
+              <div class="head" style="border-bottom:none;"><div><h2>Weigh-ins</h2><div class="small">Date • age (days) • weight</div></div></div>
+              <div class="body">
+                <table>
+                  <thead>
+                    <tr><th style="width: 30%">Date</th><th style="width: 18%">Age (days)</th><th>Weight</th><th style="text-align:right; width: 90px;">Action</th></tr>
+                  </thead>
+                  <tbody>
+                    ${weighRows || '<tr><td colspan="4" class="kmeta">No weigh-ins yet.</td></tr>'}
+                  </tbody>
+                </table>
+                <div class="small" style="margin-top: 8px;">Tip: Use “Add weigh-in” above the charts.</div>
+              </div>
+            </div>
+
+            <div class="card" style="box-shadow:none; background: rgba(255,255,255,.55);">
+              <div class="head" style="border-bottom:none;"><div><h2>Notes</h2><div class="small">Personality, feeding notes, meds, litter training…</div></div></div>
+              <div class="body">
+                <textarea id="k_notes" placeholder="Orange is a chaos muffin but purrs like a tractor…">${escapeHtml(k.notes || "")}</textarea>
+                <div style="margin-top: 10px; display:flex; justify-content:flex-end;">
+                  <button class="btn pink" id="saveNotesBtn">📝 Save notes</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+
+        // Bind delete weigh-in
+        selectedPanel.querySelectorAll("[data-del]").forEach((btn: any) => {
+          btn.addEventListener("click", () => {
+            const date = btn.getAttribute("data-del");
+            if (confirm(`Delete weigh-in on ${date} for ${k.name}?`)) {
+              k.weighIns = (k.weighIns || []).filter((w: any) => w.date !== date);
+              saveState();
+              renderAll();
+            }
+          });
+        });
+
+        document.getElementById("focusOnlyBtn")?.addEventListener("click", () => {
+          allToggle.checked = false;
+          rebuildCharts();
+        });
+        document.getElementById("showAllBtn")?.addEventListener("click", () => {
+          allToggle.checked = true;
+          rebuildCharts();
+        });
+
+        document.getElementById("saveProfileBtn")?.addEventListener("click", () => {
+          k.name = (document.getElementById("k_name") as HTMLInputElement).value.trim() || k.name;
+          k.emoji = (document.getElementById("k_emoji") as HTMLInputElement).value.trim() || k.emoji;
+          k.status = (document.getElementById("k_status") as HTMLSelectElement).value;
+          k.tag = (document.getElementById("k_tag") as HTMLInputElement).value.trim();
+          k.description = (document.getElementById("k_desc") as HTMLTextAreaElement).value;
+          ensureAdopter(k);
+          saveState();
+          renderAll();
+        });
+
+        document.getElementById("saveAdopterBtn")?.addEventListener("click", () => {
+          ensureAdopter(k);
+          k.adopter.name = (document.getElementById("a_name") as HTMLInputElement).value;
+          k.adopter.email = (document.getElementById("a_email") as HTMLInputElement).value;
+          k.adopter.phone = (document.getElementById("a_phone") as HTMLInputElement).value;
+          k.adopter.notes = (document.getElementById("a_notes") as HTMLTextAreaElement).value;
+          saveState();
+          renderAll();
+        });
+
+        document.getElementById("saveNotesBtn")?.addEventListener("click", () => {
+          k.notes = (document.getElementById("k_notes") as HTMLTextAreaElement).value;
+          saveState();
+          renderAll(false);
+        });
+      };
+
+      const renderAll = (rebuild = true) => {
+        unitSelect.value = state.unit;
+        bornDateEl!.textContent = state.litterBirthDateISO;
+        renderRoster();
+        renderSelected();
+        if (rebuild) rebuildCharts();
+      };
+
+      // ---------------------------
+      // Events
+      // ---------------------------
+      unitSelect.addEventListener("change", () => {
+        state.unit = unitSelect.value;
+        saveState();
+        renderAll();
+      });
+      allToggle.addEventListener("change", () => rebuildCharts());
+      normalizeToggle.addEventListener("change", () => rebuildCharts());
+      searchInput.addEventListener("input", () => renderRoster());
+
+      exportBtn.addEventListener("click", () => {
+        const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `kitten-growth-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      });
+
+      importFile.addEventListener("change", () => {
+        const f = importFile.files?.[0];
+        if (!f) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const incoming = JSON.parse(String(reader.result || ""));
+            const merged: any = deepClone(SEED);
+            merged.unit = incoming.unit === "g" ? "g" : "oz";
+            merged.litterBirthDateISO = incoming.litterBirthDateISO || merged.litterBirthDateISO;
+            const byId = new Map((incoming.kittens || []).map((k: any) => [k.id, k]));
+            merged.kittens = merged.kittens.map((k: any) => {
+              const inc = byId.get(k.id);
+              if (!inc) return k;
+              return {
+                ...k,
+                ...inc,
+                id: k.id,
+                adopter: { ...k.adopter, ...(inc.adopter || {}) },
+                weighIns: sortWeighIns(Array.isArray(inc.weighIns) ? inc.weighIns : k.weighIns),
+                milestones: Array.isArray(inc.milestones) ? inc.milestones : k.milestones || [],
+              };
+            });
+            state = merged;
+            selectedId = state.kittens[0]?.id || selectedId;
+            saveState();
+            renderAll();
+          } catch (e: any) {
+            alert("Could not import JSON: " + e);
+          }
+        };
+        reader.readAsText(f);
+        importFile.value = "";
+      });
+
+      resetBtn.addEventListener("click", () => {
+        if (confirm("Reset back to the original photo data? This overwrites your saved data.")) {
+          state = deepClone(SEED);
+          selectedId = state.kittens[0]?.id || "orange";
+          saveState();
+          renderAll();
+        }
+      });
+
+      tabButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const tab = btn.getAttribute("data-tab") || "growth";
+          tabButtons.forEach((b) => b.classList.toggle("active", b === btn));
+          Object.entries(wraps).forEach(([k, el]) => {
+            if (el) el.style.display = k === tab ? "" : "none";
+          });
+        });
+      });
+
+      addWeighBtn.addEventListener("click", () => {
+        const k = state.kittens.find((x: any) => x.id === selectedId);
+        if (!k) return;
+        weighUnit.textContent = state.unit;
+        weighValue.value = "";
+
+        const s = sortWeighIns(k.weighIns || []);
+        let d = new Date();
+        if (s.length) {
+          const last = new Date(s[s.length - 1].date + "T00:00:00");
+          last.setDate(last.getDate() + 1);
+          d = last;
+        }
+        weighDate.value = d.toISOString().slice(0, 10);
+        weighDialog.showModal();
+      });
+
+      document.getElementById("weighSave")?.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        const k = state.kittens.find((x: any) => x.id === selectedId);
+        if (!k) return;
+        const date = weighDate.value;
+        const num = Number(String(weighValue.value).trim());
+        if (!date || !Number.isFinite(num)) {
+          alert("Please enter a valid date and number.");
+          return;
+        }
+        const oz = state.unit === "g" ? gToOz(num) : num;
+        const existing = (k.weighIns || []).find((w: any) => w.date === date);
+        if (existing) existing.oz = oz;
+        else (k.weighIns || []).push({ date, oz });
+        k.weighIns = sortWeighIns(k.weighIns || []);
+        saveState();
+        weighDialog.close();
+        renderAll();
+      });
+
+      const tickAge = () => {
+        const a = formatAge(msSinceISOStart(state.litterBirthDateISO));
+        ageTickerEl!.textContent = `${a.days}d ${String(a.hrs).padStart(2, "0")}h ${String(a.mins).padStart(2, "0")}m ${String(a.secs).padStart(2, "0")}s`;
+      };
+      tickAge();
+      window.setInterval(tickAge, 1000);
+
+      // ---------------------------
+      // Lightweight self-tests (runs once; logs to console)
+      // ---------------------------
+      const tests: Array<{ name: string; run: () => void }> = [];
+      const assert = (cond: any, msg: string) => {
+        if (!cond) throw new Error(msg);
+      };
+
+      tests.push({
+        name: "Seed has 6 kittens",
+        run: () => assert(SEED.kittens.length === 6, "Expected 6 kittens in seed data"),
+      });
+      tests.push({
+        name: "oz↔g conversions are roughly inverse",
+        run: () => {
+          const oz = 10;
+          const g = ozToG(oz);
+          const oz2 = gToOz(g);
+          assert(Math.abs(oz2 - oz) < 1e-9, "Expected gToOz(ozToG(x))≈x");
+        },
+      });
+      tests.push({
+        name: "dayDiffISO basic sanity",
+        run: () => {
+          assert(dayDiffISO("2026-01-01", "2026-01-05") === 4, "Expected 4 day difference");
+        },
+      });
+
+      try {
+        tests.forEach((t) => t.run());
+        // eslint-disable-next-line no-console
+        console.info(`Kitten tracker self-tests: ${tests.length} passed ✅`);
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error("Kitten tracker self-tests failed ❌", e);
+      }
+
+      // Initial render
+      bornDateEl!.textContent = state.litterBirthDateISO;
+      unitSelect.value = state.unit;
+      renderAll();
+    };
+
+    init().catch((e) => {
+      // eslint-disable-next-line no-console
+      console.error(e);
+      alert(String(e));
+    });
+  }, []);
 
   return (
-    <div className="min-h-screen w-full bg-background text-foreground">
-      <div className="mx-auto max-w-6xl px-4 py-6">
-        <div className="relative overflow-hidden rounded-[30px] border bg-card shadow-sm">
-          <CuteBackdrop />
-          <div className="relative p-5 md:p-6">
-            <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <motion.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.35 }}
-                className="space-y-1"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-2xl font-semibold tracking-tight">Kitten Growth Tracker</span>
-                  <Pill>
-                    <Sparkles className="h-3.5 w-3.5" />
-                    extra cutesy
-                  </Pill>
-                  <Pill>
-                    <Cat className="h-3.5 w-3.5" />
-                    6 tiny gremlins
-                  </Pill>
-                </div>
-                <p className="text-sm text-muted-foreground">Track weigh-ins, trends, milestones, and adopters — saved locally in your browser.</p>
-              </motion.div>
+    <div>
+      {/* Fonts */}
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      <link
+        href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&family=Nunito:wght@400;600;700&display=swap"
+        rel="stylesheet"
+      />
 
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-2 rounded-2xl border bg-background/60 px-3 py-2">
-                  <Label className="text-xs text-muted-foreground">Units</Label>
-                  <Select value={state.unit} onValueChange={setUnit}>
-                    <SelectTrigger className="h-8 w-[120px] rounded-xl">
-                      <SelectValue placeholder="Units" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="oz">Ounces (oz)</SelectItem>
-                      <SelectItem value="g">Grams (g)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+      <style>{`
+        :root{
+          --bg: #fff7fb;
+          --card: rgba(255,255,255,.75);
+          --card-strong: rgba(255,255,255,.9);
+          --ink: #1f2430;
+          --muted: rgba(31,36,48,.65);
+          --border: rgba(31,36,48,.12);
+          --shadow: 0 10px 30px rgba(31,36,48,.08);
+          --pink: #ffb7d1;
+          --mint: #baf7e6;
+          --lav: #d8c7ff;
+          --chip: rgba(255,255,255,.65);
+          --ok: #2d7a45;
+          --warn: #b15c00;
+          --bad: #a12121;
+          --radius: 22px;
+        }
+        *{ box-sizing: border-box; }
+        body{ margin:0; }
+        .kgt-body{
+          margin:0;
+          font-family: Nunito, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+          color: var(--ink);
+          background:
+            radial-gradient(600px 600px at 10% 10%, var(--mint), transparent 60%),
+            radial-gradient(700px 700px at 90% 20%, var(--lav), transparent 60%),
+            radial-gradient(700px 700px at 40% 110%, var(--pink), transparent 60%),
+            linear-gradient(180deg, var(--bg), #ffffff);
+          min-height: 100vh;
+          padding: 22px 16px 40px;
+        }
+        .container{ max-width: 1100px; margin: 0 auto; }
+        .shell{
+          position: relative;
+          border: 1px solid var(--border);
+          border-radius: 32px;
+          background: rgba(255,255,255,.6);
+          box-shadow: var(--shadow);
+          overflow: hidden;
+        }
+        .shell:before{
+          content:"";
+          position:absolute; inset:0;
+          background-image:
+            radial-gradient(circle at 20px 18px, rgba(31,36,48,.10) 0 6px, transparent 7px),
+            radial-gradient(circle at 44px 18px, rgba(31,36,48,.10) 0 6px, transparent 7px),
+            radial-gradient(circle at 32px 40px, rgba(31,36,48,.10) 0 7px, transparent 8px),
+            radial-gradient(circle at 32px 58px, rgba(31,36,48,.10) 0 10px, transparent 11px);
+          background-size: 140px 140px;
+          background-position: 10px 10px;
+          opacity: .06;
+          pointer-events:none;
+        }
+        header{
+          position: relative;
+          padding: 18px 18px 10px;
+          display:flex;
+          gap: 12px;
+          align-items:flex-start;
+          justify-content: space-between;
+          flex-wrap: wrap;
+        }
+        h1{
+          margin:0;
+          font-family: Fredoka, Nunito, system-ui;
+          font-weight: 600;
+          letter-spacing: .2px;
+          font-size: 26px;
+          display:flex;
+          align-items:center;
+          gap: 10px;
+        }
+        .sub{ margin-top:6px; color: var(--muted); font-size: 13px; }
+        .row{ display:flex; gap:10px; flex-wrap: wrap; align-items:center; }
+        .pill{
+          display:inline-flex;
+          align-items:center;
+          gap:8px;
+          padding: 8px 12px;
+          background: var(--chip);
+          border: 1px solid var(--border);
+          border-radius: 999px;
+          font-size: 12px;
+          color: rgba(31,36,48,.8);
+          backdrop-filter: blur(8px);
+        }
+        .btn{
+          appearance:none;
+          border: 1px solid var(--border);
+          background: rgba(255,255,255,.9);
+          border-radius: 999px;
+          padding: 9px 12px;
+          font-weight: 700;
+          font-size: 13px;
+          cursor:pointer;
+          transition: transform .06s ease, box-shadow .2s ease;
+          box-shadow: 0 6px 18px rgba(31,36,48,.06);
+        }
+        .btn:hover{ transform: translateY(-1px); }
+        .btn:active{ transform: translateY(0px); }
+        .btn.primary{
+          border-color: rgba(31,36,48,.16);
+          background: linear-gradient(180deg, #ffffff, rgba(255,255,255,.8));
+        }
+        .btn.pink{
+          background: linear-gradient(180deg, var(--pink), rgba(255,255,255,.85));
+          border-color: rgba(255,183,209,.7);
+        }
+        .grid{
+          position: relative;
+          padding: 0 18px 18px;
+          display:grid;
+          gap: 14px;
+          grid-template-columns: 1.4fr .9fr;
+        }
+        @media (max-width: 980px){ .grid{ grid-template-columns: 1fr; } }
+        .card{
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          background: rgba(255,255,255,.75);
+          backdrop-filter: blur(10px);
+          box-shadow: 0 10px 24px rgba(31,36,48,.05);
+          overflow:hidden;
+        }
+        .card .head{
+          padding: 14px 14px 10px;
+          display:flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 12px;
+          border-bottom: 1px solid rgba(31,36,48,.06);
+          background: linear-gradient(180deg, rgba(255,255,255,.7), rgba(255,255,255,.3));
+        }
+        .card h2{ margin:0; font-size: 15px; font-family: Fredoka, Nunito, system-ui; font-weight: 600; }
+        .small{ color: var(--muted); font-size: 12px; margin-top: 4px; }
+        .card .body{ padding: 14px; }
+        .kittens{ display:grid; grid-template-columns: 1fr; gap: 10px; }
+        .krow{
+          display:flex; justify-content: space-between; gap: 10px;
+          padding: 10px 10px; border: 1px solid rgba(31,36,48,.10);
+          border-radius: 18px; background: rgba(255,255,255,.65);
+          cursor: pointer; transition: transform .06s ease, background .2s ease;
+        }
+        .krow:hover{ transform: translateY(-1px); background: rgba(255,255,255,.8); }
+        .krow.active{ outline: 2px solid rgba(31,36,48,.16); }
+        .kname{ display:flex; align-items:center; gap: 10px; }
+        .emoji{ font-size: 20px; }
+        .kmeta{ font-size: 12px; color: var(--muted); }
+        .badge{ font-size: 11px; font-weight: 800; padding: 5px 8px; border-radius: 999px; border: 1px solid var(--border); background: rgba(255,255,255,.8); }
+        .badge.avail{ color: var(--ok); }
+        .badge.resv{ color: #b15c00; }
+        .badge.adpt{ color: var(--bad); }
+        .controls{ display:flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        label{ font-size: 12px; color: rgba(31,36,48,.85); font-weight: 800; }
+        input, select, textarea{ width: 100%; border: 1px solid rgba(31,36,48,.14); border-radius: 16px; padding: 10px 12px; background: rgba(255,255,255,.75); outline: none; font-size: 13px; }
+        textarea{ resize: vertical; min-height: 88px; }
+        .two{ display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        @media (max-width: 720px){ .two{ grid-template-columns: 1fr; } }
+        .tabs{ display:flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+        .tabbar{ display:flex; gap: 6px; flex-wrap: wrap; border: 1px solid rgba(31,36,48,.10); border-radius: 999px; padding: 6px; background: rgba(255,255,255,.6); }
+        .tabbtn{ border: none; background: transparent; padding: 8px 10px; border-radius: 999px; font-weight: 900; font-size: 12px; cursor:pointer; color: rgba(31,36,48,.7); }
+        .tabbtn.active{ background: rgba(31,36,48,.08); color: rgba(31,36,48,.95); }
+        .charts{ display:grid; grid-template-columns: 1fr; gap: 12px; }
+        .chartWrap{ height: 320px; }
+        .chartWrap.short{ height: 260px; }
+        .hint{ font-size: 12px; color: var(--muted); background: rgba(255,255,255,.6); border: 1px dashed rgba(31,36,48,.16); border-radius: 18px; padding: 10px 12px; }
+        table{ width: 100%; border-collapse: collapse; overflow:hidden; border-radius: 18px; border: 1px solid rgba(31,36,48,.10); background: rgba(255,255,255,.6); }
+        th, td{ padding: 10px 10px; text-align:left; font-size: 13px; }
+        th{ font-size: 12px; color: var(--muted); font-weight: 900; background: rgba(31,36,48,.03); }
+        tr+tr td{ border-top: 1px solid rgba(31,36,48,.06); }
+        .footer{ padding: 14px 18px 18px; color: var(--muted); font-size: 12px; }
+        .kheader{ display:flex; align-items:center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        .bigEmoji{ font-size: 30px; }
+        .statRow{ display:grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+        @media (max-width: 900px){ .statRow{ grid-template-columns: repeat(2, 1fr); } }
+        .stat{ border: 1px solid rgba(31,36,48,.10); border-radius: 18px; background: rgba(255,255,255,.7); padding: 10px 12px; }
+        .stat .t{ font-size: 11px; color: var(--muted); font-weight: 900; }
+        .stat .v{ margin-top: 4px; font-size: 18px; font-family: Fredoka, Nunito, system-ui; }
+        .stat .s{ margin-top: 2px; font-size: 11px; color: var(--muted); }
+        .miniActions{ display:flex; gap: 8px; flex-wrap: wrap; }
+        .fileInput{ display:none; }
+      `}</style>
 
-                <Button variant="outline" className="rounded-2xl" onClick={exportData}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Export
-                </Button>
+      <div className="kgt-body">
+        <div className="container">
+          <div className="shell">
+            <header>
+              <div>
+                <h1>
+                  Kitten Growth Tracker <span aria-hidden>🐾</span>
+                </h1>
+                <div className="sub">GitHub Pages-friendly • saved in your browser • multiple charts • adopter tracking • live age ticker</div>
+              </div>
 
-                <label className="inline-flex">
-                  <input
-                    type="file"
-                    accept="application/json"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) importData(f);
-                      e.currentTarget.value = "";
-                    }}
-                  />
-                  <span>
-                    <Button variant="outline" className="rounded-2xl" asChild>
-                      <span>
-                        <Upload className="mr-2 h-4 w-4" />
-                        Import
-                      </span>
-                    </Button>
-                  </span>
+              <div className="row">
+                <span className="pill" title="Litter age updates every second">
+                  <span aria-hidden>⏱️</span> Litter age: <span id="ageTicker" style={{ fontWeight: 900 }}>—</span>
+                </span>
+                <span className="pill" title="Born date">
+                  <span aria-hidden>🎂</span> Born: <span id="bornDate">—</span>
+                </span>
+                <button className="btn" id="exportBtn" title="Download your data as JSON">⬇️ Export</button>
+                <label className="btn" title="Import a previously exported JSON">
+                  ⬆️ Import
+                  <input className="fileInput" id="importFile" type="file" accept="application/json" />
                 </label>
+                <button className="btn pink" id="resetBtn" title="Reset back to the original photo data">🧼 Reset</button>
               </div>
             </header>
 
-            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-              <div className="rounded-3xl border bg-background/60 p-4 md:col-span-2">
-                <div className="flex items-start justify-between gap-3">
+            <div className="grid">
+              <div className="card">
+                <div className="head">
                   <div>
-                    <div className="text-xs text-muted-foreground">Litter birthday</div>
-                    <div className="mt-1 text-sm font-medium">{state.litterBirthDateISO} 🎂</div>
+                    <h2>Charts (pick a tab!)</h2>
+                    <div className="small">Hover for details • toggle “All kittens” vs selected • swap units anytime</div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-xs text-muted-foreground">Litter age (live)</div>
-                    <div className="mt-1 font-mono text-sm">
-                      {liveAge.days}d {String(liveAge.hours).padStart(2, "0")}h {String(liveAge.minutes).padStart(2, "0")}m {String(liveAge.seconds).padStart(2, "0")}s
-                    </div>
+                  <div className="controls">
+                    <label style={{ width: 140 }}>
+                      Units
+                      <select id="unitSelect">
+                        <option value="oz">Ounces (oz)</option>
+                        <option value="g">Grams (g)</option>
+                      </select>
+                    </label>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, width: "auto", fontWeight: 900 as any }}>
+                      <input id="allToggle" type="checkbox" defaultChecked /> All kittens
+                    </label>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, width: "auto", fontWeight: 900 as any }}>
+                      <input id="normalizeToggle" type="checkbox" /> Normalize
+                    </label>
                   </div>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                  <Pill>
-                    <Users className="h-3.5 w-3.5" />
-                    {reservedCount} reserved
-                  </Pill>
-                  <Pill>
-                    <Heart className="h-3.5 w-3.5" />
-                    {adoptedCount} adopted
-                  </Pill>
-                  <Pill>
-                    <PawPrint className="h-3.5 w-3.5" />
-                    hover charts for age-in-days
-                  </Pill>
+
+                <div className="body">
+                  <div className="tabs">
+                    <div className="tabbar" role="tablist" aria-label="Chart tabs">
+                      <button className="tabbtn active" data-tab="growth" role="tab">📈 Growth</button>
+                      <button className="tabbtn" data-tab="gain" role="tab">⚡ Daily gain</button>
+                      <button className="tabbtn" data-tab="avg" role="tab">✨ Litter avg</button>
+                      <button className="tabbtn" data-tab="latest" role="tab">🏆 Latest weights</button>
+                    </div>
+                    <div className="miniActions">
+                      <button className="btn primary" id="addWeighBtn" title="Add a weigh-in for the selected kitten">➕ Add weigh-in</button>
+                    </div>
+                  </div>
+
+                  <div className="charts">
+                    <div className="hint" id="chartHint">Tip: Turn on Normalize to compare growth curves (change since first weigh-in).</div>
+
+                    <div className="chartWrap" id="wrap-growth"><canvas id="chartGrowth" /></div>
+                    <div className="chartWrap" id="wrap-gain" style={{ display: "none" }}><canvas id="chartGain" /></div>
+                    <div className="chartWrap short" id="wrap-avg" style={{ display: "none" }}><canvas id="chartAvg" /></div>
+                    <div className="chartWrap short" id="wrap-latest" style={{ display: "none" }}><canvas id="chartLatest" /></div>
+                  </div>
                 </div>
               </div>
 
-              <div className="rounded-3xl border bg-background/60 p-4">
-                <div className="text-xs text-muted-foreground">Roster</div>
-                <div className="mt-1 text-sm font-medium">6 kittens • no new additions expected 🐾</div>
-                <div className="mt-3">
-                  <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search (name / tag / adopter)" className="rounded-2xl" />
+              <div className="card">
+                <div className="head">
+                  <div>
+                    <h2>Roster</h2>
+                    <div className="small">6 kittens • tap one to edit adopter + weigh-ins</div>
+                  </div>
+                  <label style={{ width: 190 }}>
+                    Search
+                    <input id="searchInput" type="text" placeholder="name, tag, adopter…" />
+                  </label>
                 </div>
+                <div className="body">
+                  <div className="kittens" id="kittensList" />
+                </div>
+              </div>
+
+              <div className="card" style={{ gridColumn: "1 / -1" }}>
+                <div className="head">
+                  <div className="kheader">
+                    <div>
+                      <h2>Selected kitten</h2>
+                      <div className="small" id="selectedSub">—</div>
+                    </div>
+                    <div className="row">
+                      <span className="pill" title="This is the currently selected kitten">
+                        <span aria-hidden>🐾</span> <span id="selectedNamePill">—</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="body" id="selectedPanel">{/* Filled by JS */}</div>
               </div>
             </div>
 
-            {alerts.length > 0 && (
-              <Card className="mt-5 rounded-3xl border">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <AlertTriangle className="h-4 w-4" />
-                    Friendly flags
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <p className="text-xs text-muted-foreground">These are simple trend checks — not medical advice. If something looks off, consider checking with a vet.</p>
-                  <div className="space-y-2">
-                    {alerts.map((a, idx) => (
-                      <div key={idx} className="rounded-2xl border px-3 py-2 text-sm">{a.message}</div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
-              {/* LEFT: MULTI-CHART AREA */}
-              <Card className="rounded-3xl md:col-span-2">
-                <CardHeader className="pb-2">
-                  <div className="flex flex-col gap-3">
-                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                      <CardTitle className="text-base">Charts & dashboards</CardTitle>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="min-w-[240px]">
-                          <Select value={selectedKittenId} onValueChange={setSelectedKittenId}>
-                            <SelectTrigger className="h-9 rounded-2xl">
-                              <SelectValue placeholder="Select a kitten" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {filteredKittens.map((k) => (
-                                <SelectItem key={k.id} value={k.id}>
-                                  {k.emoji || "🐾"} {k.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <QuickWeighInDialog kitten={selectedKitten} unit={state.unit} onAdd={(dateISO, value) => addWeighIn(selectedKitten.id, dateISO, value, state.unit)} />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-3 rounded-3xl border bg-muted/40 p-3 md:grid-cols-2">
-                      <div className="flex items-center justify-between rounded-2xl border bg-background px-3 py-2">
-                        <div>
-                          <div className="text-sm font-medium">Show all kittens</div>
-                          <div className="text-xs text-muted-foreground">Or focus on the selected kitten</div>
-                        </div>
-                        <Switch checked={showAllLines} onCheckedChange={setShowAllLines} />
-                      </div>
-
-                      <div className="flex items-center justify-between rounded-2xl border bg-background px-3 py-2">
-                        <div>
-                          <div className="text-sm font-medium">Normalize</div>
-                          <div className="text-xs text-muted-foreground">Change since first weigh-in</div>
-                        </div>
-                        <Switch checked={normalizeToFirst} onCheckedChange={setNormalizeToFirst} />
-                      </div>
-
-                      <div className="flex items-center justify-between rounded-2xl border bg-background px-3 py-2">
-                        <div>
-                          <div className="text-sm font-medium">Age axis</div>
-                          <div className="text-xs text-muted-foreground">Use age-in-days labels</div>
-                        </div>
-                        <Switch checked={showAgeAxis} onCheckedChange={setShowAgeAxis} />
-                      </div>
-
-                      <div className="rounded-2xl border bg-background px-3 py-2">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="text-sm font-medium">Smoothing</div>
-                            <div className="text-xs text-muted-foreground">Moving average window</div>
-                          </div>
-                          <Badge variant="outline" className="rounded-2xl">{smoothingPoints} pt</Badge>
-                        </div>
-                        <div className="mt-2">
-                          <Slider value={[smoothingPoints]} onValueChange={(v) => setSmoothingPoints(v?.[0] ?? 1)} min={1} max={5} step={1} />
-                        </div>
-                      </div>
-                    </div>
-
-                    <Tabs defaultValue="growth" className="w-full">
-                      <TabsList className="rounded-2xl">
-                        <TabsTrigger value="growth" className="gap-2"><LineChartIcon className="h-4 w-4" />Growth</TabsTrigger>
-                        <TabsTrigger value="gain" className="gap-2"><LineChartIcon className="h-4 w-4" />Daily gain</TabsTrigger>
-                        <TabsTrigger value="litter" className="gap-2"><Sparkles className="h-4 w-4" />Litter avg</TabsTrigger>
-                        <TabsTrigger value="latest" className="gap-2"><BarChart3 className="h-4 w-4" />Latest weights</TabsTrigger>
-                      </TabsList>
-
-                      <TabsContent value="growth" className="mt-4">
-                        <ChartCard title="Growth over time" subtitle={normalizeToFirst ? `Showing Δ weight (${unitLabel})` : `Showing weight (${unitLabel})`}>
-                          <div className="h-[360px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <LineChart data={growthChartData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey={showAgeAxis ? "ageDays" : "date"} tick={{ fontSize: 12 }} label={showAgeAxis ? { value: "Age (days)", position: "insideBottom", offset: -2 } : undefined} />
-                                <YAxis tick={{ fontSize: 12 }} width={64} label={{ value: normalizeToFirst ? `Δ weight (${unitLabel})` : `Weight (${unitLabel})`, angle: -90, position: "insideLeft" }} />
-                                <Tooltip
-                                  formatter={(v, name) => {
-                                    if (v == null) return ["—", name];
-                                    const label = normalizeToFirst ? `${fmt(v, state.unit === "g" ? 1 : 2)} ${unitLabel}` : `${v} ${unitLabel}`;
-                                    return [label, name];
-                                  }}
-                                  labelFormatter={(label, payload) => {
-                                    const row = payload?.[0]?.payload;
-                                    if (!row) return `Date: ${label}`;
-                                    return showAgeAxis ? `Age: ${row.ageDays} days • Date: ${row.date}` : `Date: ${row.date} • Age: ${row.ageDays} days`;
-                                  }}
-                                />
-                                <Legend />
-                                {normalizeToFirst && <ReferenceLine y={0} strokeDasharray="4 4" />}
-                                <Brush dataKey={showAgeAxis ? "ageDays" : "date"} height={26} travellerWidth={10} />
-                                {(showAllLines ? state.kittens : state.kittens.filter((k) => k.id === selectedKittenId)).map((k) => (
-                                  <Line key={k.id} type="monotone" dataKey={k.id} name={`${k.emoji || "🐾"} ${k.name}`} strokeWidth={k.id === selectedKittenId ? 3 : 1.5} dot={k.id === selectedKittenId} connectNulls />
-                                ))}
-                              </LineChart>
-                            </ResponsiveContainer>
-                          </div>
-                        </ChartCard>
-                      </TabsContent>
-
-                      <TabsContent value="gain" className="mt-4">
-                        <ChartCard title="Daily gain between weigh-ins" subtitle={`Units: ${gainChartUnit}/day • First point is blank (needs a previous weigh-in)`}>
-                          <div className="h-[320px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <LineChart data={dailyGainChartData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey={showAgeAxis ? "ageDays" : "date"} tick={{ fontSize: 12 }} />
-                                <YAxis tick={{ fontSize: 12 }} width={64} label={{ value: `${gainChartUnit}/day`, angle: -90, position: "insideLeft" }} />
-                                <Tooltip
-                                  formatter={(v, name) => [v == null ? "—" : `${v} ${gainChartUnit}/day`, name]}
-                                  labelFormatter={(label, payload) => {
-                                    const row = payload?.[0]?.payload;
-                                    if (!row) return String(label);
-                                    return showAgeAxis ? `Age: ${row.ageDays} days • Date: ${row.date}` : `Date: ${row.date} • Age: ${row.ageDays} days`;
-                                  }}
-                                />
-                                <Legend />
-                                <ReferenceLine y={0} strokeDasharray="4 4" />
-                                <Brush dataKey={showAgeAxis ? "ageDays" : "date"} height={26} travellerWidth={10} />
-                                {(showAllLines ? state.kittens : state.kittens.filter((k) => k.id === selectedKittenId)).map((k) => (
-                                  <Line key={k.id} type="monotone" dataKey={k.id} name={`${k.emoji || "🐾"} ${k.name}`} strokeWidth={k.id === selectedKittenId ? 3 : 1.5} dot={false} connectNulls />
-                                ))}
-                              </LineChart>
-                            </ResponsiveContainer>
-                          </div>
-                        </ChartCard>
-                      </TabsContent>
-
-                      <TabsContent value="litter" className="mt-4">
-                        <ChartCard title="Litter average" subtitle={`Average of all kittens weighed that day (smoothed with the same setting).`}>
-                          <div className="h-[280px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <LineChart data={litterAverageData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey={showAgeAxis ? "ageDays" : "date"} tick={{ fontSize: 12 }} />
-                                <YAxis tick={{ fontSize: 12 }} width={64} label={{ value: `Avg (${unitLabel})`, angle: -90, position: "insideLeft" }} />
-                                <Tooltip
-                                  formatter={(v, name) => [v == null ? "—" : `${v} ${unitLabel}`, name]}
-                                  labelFormatter={(label, payload) => {
-                                    const row = payload?.[0]?.payload;
-                                    if (!row) return String(label);
-                                    return showAgeAxis ? `Age: ${row.ageDays} days • Date: ${row.date} • Count: ${row.count}` : `Date: ${row.date} • Age: ${row.ageDays} days • Count: ${row.count}`;
-                                  }}
-                                />
-                                <Legend />
-                                <Line type="monotone" dataKey="avg" name="✨ Litter avg" strokeWidth={3} dot />
-                                <Brush dataKey={showAgeAxis ? "ageDays" : "date"} height={26} travellerWidth={10} />
-                              </LineChart>
-                            </ResponsiveContainer>
-                          </div>
-                        </ChartCard>
-                      </TabsContent>
-
-                      <TabsContent value="latest" className="mt-4">
-                        <ChartCard title="Latest weights leaderboard" subtitle={`Sorted by most recent weight. Great for quick check-ins.`}>
-                          <div className="h-[280px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <BarChart data={latestWeightsData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                                <YAxis tick={{ fontSize: 12 }} width={64} label={{ value: `${unitLabel}`, angle: -90, position: "insideLeft" }} />
-                                <Tooltip
-                                  formatter={(v) => [v == null ? "—" : `${v} ${unitLabel}`, "Weight"]}
-                                  labelFormatter={(label, payload) => {
-                                    const row = payload?.[0]?.payload;
-                                    if (!row) return String(label);
-                                    return `${row.emoji || "🐾"} ${row.name} • ${row.date || ""}`;
-                                  }}
-                                />
-                                <Bar dataKey="value" name="Latest weight" radius={[12, 12, 0, 0]} />
-                              </BarChart>
-                            </ResponsiveContainer>
-                          </div>
-
-                          <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-                            {latestWeightsData.map((r) => (
-                              <div key={r.id} className="flex items-center justify-between rounded-2xl border bg-background px-3 py-2">
-                                <div className="flex items-center gap-2">
-                                  <div className="text-lg">{r.emoji || "🐾"}</div>
-                                  <div>
-                                    <div className="text-sm font-medium">{r.name}</div>
-                                    <div className="text-xs text-muted-foreground">{r.date || "No weigh-ins"}</div>
-                                  </div>
-                                </div>
-                                <div className="text-sm font-medium">{r.value == null ? "—" : `${fmt(r.value, state.unit === "g" ? 1 : 2)} ${unitLabel}`}</div>
-                              </div>
-                            ))}
-                          </div>
-                        </ChartCard>
-                      </TabsContent>
-                    </Tabs>
-                  </div>
-                </CardHeader>
-              </Card>
-
-              {/* RIGHT: AT-A-GLANCE */}
-              <Card className="rounded-3xl">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">At-a-glance</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Total kittens</span>
-                    <span className="text-sm font-medium">{state.kittens.length}</span>
-                  </div>
-                  <Separator />
-                  <div className="space-y-2">
-                    {summary.map((c) => (
-                      <button
-                        key={c.id}
-                        className={`w-full rounded-2xl border px-3 py-2 text-left transition hover:bg-muted ${c.id === selectedKittenId ? "bg-muted" : ""}`}
-                        onClick={() => setSelectedKittenId(c.id)}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <div className="text-lg">{c.emoji}</div>
-                              <div className="text-sm font-medium">{c.name}</div>
-                              <div className="text-xs">{badgeForStatus(c.status)}</div>
-                            </div>
-                            <div className="mt-1 flex flex-wrap items-center gap-2">
-                              <span className="text-xs text-muted-foreground">{c.lastDate || "No weigh-ins"}</span>
-                              {c.status !== "Available" && c.adopterName && (
-                                <span className="text-xs text-muted-foreground">• adopter: {c.adopterName}</span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-sm font-medium">{c.lastValue == null ? "—" : `${fmt(c.lastValue, state.unit === "g" ? 1 : 2)} ${unitLabel}`}</div>
-                            <div className="text-xs text-muted-foreground">{c.delta == null ? "" : `${c.delta >= 0 ? "+" : ""}${fmt(c.delta, state.unit === "g" ? 1 : 2)} ${unitLabel}`}</div>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="mt-5">
-              <Tabs defaultValue="profile" className="w-full">
-                <TabsList className="rounded-2xl">
-                  <TabsTrigger value="profile">Profile</TabsTrigger>
-                  <TabsTrigger value="weighins">Weigh-ins</TabsTrigger>
-                  <TabsTrigger value="notes">Notes & milestones</TabsTrigger>
-                  <TabsTrigger value="settings">Settings</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="profile" className="mt-4">
-                  <KittenProfileCard kitten={selectedKitten} unit={state.unit} litterBirthDateISO={state.litterBirthDateISO} onUpdate={upsertKitten} />
-                </TabsContent>
-
-                <TabsContent value="weighins" className="mt-4">
-                  <WeighInsTable kitten={selectedKitten} unit={state.unit} litterBirthDateISO={state.litterBirthDateISO} onAdd={(dateISO, value) => addWeighIn(selectedKitten.id, dateISO, value, state.unit)} onDelete={(dateISO) => deleteWeighIn(selectedKitten.id, dateISO)} />
-                </TabsContent>
-
-                <TabsContent value="notes" className="mt-4">
-                  <NotesMilestones kitten={selectedKitten} onUpdate={upsertKitten} />
-                </TabsContent>
-
-                <TabsContent value="settings" className="mt-4">
-                  <SettingsCard state={state} setState={setState} />
-                </TabsContent>
-              </Tabs>
-            </div>
-
-            <footer className="mt-10 text-xs text-muted-foreground">Export your data occasionally so you can hand adopters a sweet little growth history. 🐾</footer>
+            <div className="footer">Made for cozy kitten season. Export your JSON occasionally so you can hand adopters a sweet history. 💖</div>
           </div>
         </div>
       </div>
+
+      <dialog
+        id="weighDialog"
+        style={{
+          border: "none",
+          borderRadius: 22,
+          padding: 0,
+          width: "min(520px, 92vw)",
+          boxShadow: "0 10px 30px rgba(31,36,48,.08)",
+        }}
+      >
+        <form
+          method="dialog"
+          style={{
+            padding: 14,
+            background: "rgba(255,255,255,.96)",
+            border: "1px solid rgba(31,36,48,.14)",
+            borderRadius: 22,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+            <div style={{ fontFamily: "Fredoka, Nunito", fontSize: 16, fontWeight: 600 }}>Add weigh-in</div>
+            <button className="btn" value="cancel" aria-label="Close">✖</button>
+          </div>
+          <div style={{ marginTop: 10 }} className="two">
+            <div>
+              <label>Date</label>
+              <input type="date" id="weighDate" />
+            </div>
+            <div>
+              <label>
+                Weight (<span id="weighUnit">oz</span>)
+              </label>
+              <input type="text" inputMode="decimal" id="weighValue" placeholder="e.g., 7.13" />
+            </div>
+          </div>
+          <div className="hint" style={{ marginTop: 10 }}>If you already weighed on that date, this will update it.</div>
+          <div style={{ marginTop: 10, display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <button className="btn" value="cancel">Cancel</button>
+            <button className="btn pink" id="weighSave" value="default">Save</button>
+          </div>
+        </form>
+      </dialog>
     </div>
   );
 }
-
-function ChartCard({ title, subtitle, children }) {
-  return (
-    <Card className="rounded-3xl border">
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardTitle className="text-base">{title}</CardTitle>
-            {subtitle ? <div className="mt-1 text-xs text-muted-foreground">{subtitle}</div> : null}
-          </div>
-          <Pill>
-            <PawPrint className="h-3.5 w-3.5" />
-            charts
-          </Pill>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">{children}</CardContent>
-    </Card>
-  );
-}
-
-function QuickWeighInDialog({ kitten, unit, onAdd }) {
-  const [open, setOpen] = useState(false);
-  const [dateISO, setDateISO] = useState(() => nextISODateFromLast(kitten.weighIns));
-  const [value, setValue] = useState("");
-
-  useEffect(() => {
-    setDateISO(nextISODateFromLast(kitten.weighIns));
-    setValue("");
-  }, [kitten?.id]);
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="rounded-2xl">
-          <Plus className="mr-2 h-4 w-4" />
-          Add weigh-in
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="rounded-3xl">
-        <DialogHeader>
-          <DialogTitle>Add weigh-in for {kitten.emoji || "🐾"} {kitten.name}</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-3">
-          <div className="grid gap-2">
-            <Label>Date</Label>
-            <Input type="date" value={dateISO} onChange={(e) => setDateISO(e.target.value)} className="rounded-2xl" />
-          </div>
-          <div className="grid gap-2">
-            <Label>Weight ({unit})</Label>
-            <Input inputMode="decimal" placeholder={unit === "g" ? "e.g., 210" : "e.g., 7.13"} value={value} onChange={(e) => setValue(e.target.value)} className="rounded-2xl" />
-            <p className="text-xs text-muted-foreground">If a weigh-in already exists for this date, it will be updated.</p>
-          </div>
-          <Button
-            className="rounded-2xl"
-            onClick={() => {
-              onAdd(dateISO, value);
-              setOpen(false);
-            }}
-          >
-            Save
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function KittenProfileCard({ kitten, unit, litterBirthDateISO, onUpdate }) {
-  const last = latestWeighIn(kitten.weighIns);
-  const prev = prevWeighIn(kitten.weighIns);
-  const trend = calcTrend(kitten.weighIns);
-
-  const lastVal = last ? getValueInUnit(last, unit) : null;
-  const prevVal = prev ? getValueInUnit(prev, unit) : null;
-  const delta = last && prev ? lastVal - prevVal : null;
-  const deltaPerDay = trend ? (unit === "g" ? trend.gainGPerDay : trend.gainOzPerDay) : null;
-  const ageDays = last ? Math.max(0, dayDiffISO(litterBirthDateISO, last.date)) : null;
-
-  const [local, setLocal] = useState(() => ({
-    name: kitten.name,
-    emoji: kitten.emoji || "🐱",
-    colorTag: kitten.colorTag || "",
-    description: kitten.description || "",
-    adoptionStatus: kitten.adoptionStatus || "Available",
-    adopterName: kitten.adopter?.name || "",
-    adopterEmail: kitten.adopter?.email || "",
-    adopterPhone: kitten.adopter?.phone || "",
-    adopterNotes: kitten.adopter?.notes || "",
-  }));
-
-  useEffect(() => {
-    setLocal({
-      name: kitten.name,
-      emoji: kitten.emoji || "🐱",
-      colorTag: kitten.colorTag || "",
-      description: kitten.description || "",
-      adoptionStatus: kitten.adoptionStatus || "Available",
-      adopterName: kitten.adopter?.name || "",
-      adopterEmail: kitten.adopter?.email || "",
-      adopterPhone: kitten.adopter?.phone || "",
-      adopterNotes: kitten.adopter?.notes || "",
-    });
-  }, [kitten.id]);
-
-  const adopterVisible = local.adoptionStatus !== "Available";
-
-  return (
-    <Card className="rounded-3xl">
-      <CardHeader className="pb-2">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <CardTitle className="text-base">{local.emoji} {kitten.name} profile</CardTitle>
-          <div className="flex items-center gap-2">{badgeForStatus(local.adoptionStatus)}</div>
-        </div>
-      </CardHeader>
-      <CardContent className="grid gap-4">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div className="grid gap-2">
-            <Label>Name</Label>
-            <Input value={local.name} onChange={(e) => setLocal((s) => ({ ...s, name: e.target.value }))} className="rounded-2xl" />
-          </div>
-          <div className="grid gap-2">
-            <Label>Emoji avatar</Label>
-            <Input value={local.emoji} onChange={(e) => setLocal((s) => ({ ...s, emoji: e.target.value }))} className="rounded-2xl" placeholder="🐱" />
-            <div className="text-xs text-muted-foreground">Pick anything: 🐈‍⬛ 🧡 🎀 🌸 😼</div>
-          </div>
-          <div className="grid gap-2">
-            <Label>Color tag</Label>
-            <Input value={local.colorTag} onChange={(e) => setLocal((s) => ({ ...s, colorTag: e.target.value }))} className="rounded-2xl" />
-          </div>
-          <div className="grid gap-2">
-            <Label>Adoption status</Label>
-            <Select value={local.adoptionStatus} onValueChange={(v) => setLocal((s) => ({ ...s, adoptionStatus: v }))}>
-              <SelectTrigger className="rounded-2xl"><SelectValue placeholder="Status" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Available">Available</SelectItem>
-                <SelectItem value="Reserved">Reserved</SelectItem>
-                <SelectItem value="Adopted">Adopted</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2 md:col-span-2">
-            <Label>Description</Label>
-            <Textarea value={local.description} onChange={(e) => setLocal((s) => ({ ...s, description: e.target.value }))} className="rounded-2xl" />
-          </div>
-        </div>
-
-        <Card className="rounded-3xl border">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Adopter info</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="rounded-2xl border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-              Set status to Reserved or Adopted to track who is adopting this kitten.
-            </div>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div className="grid gap-2">
-                <Label>Adopter name</Label>
-                <Input value={local.adopterName} onChange={(e) => setLocal((s) => ({ ...s, adopterName: e.target.value }))} className="rounded-2xl" disabled={!adopterVisible} />
-              </div>
-              <div className="grid gap-2">
-                <Label>Email</Label>
-                <Input value={local.adopterEmail} onChange={(e) => setLocal((s) => ({ ...s, adopterEmail: e.target.value }))} className="rounded-2xl" disabled={!adopterVisible} />
-              </div>
-              <div className="grid gap-2">
-                <Label>Phone</Label>
-                <Input value={local.adopterPhone} onChange={(e) => setLocal((s) => ({ ...s, adopterPhone: e.target.value }))} className="rounded-2xl" disabled={!adopterVisible} />
-              </div>
-              <div className="grid gap-2 md:col-span-2">
-                <Label>Notes</Label>
-                <Textarea value={local.adopterNotes} onChange={(e) => setLocal((s) => ({ ...s, adopterNotes: e.target.value }))} className="rounded-2xl" disabled={!adopterVisible} placeholder="Meetup preferences, home notes, gotcha-day plan…" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="flex flex-wrap gap-2">
-          <Button
-            className="rounded-2xl"
-            onClick={() =>
-              onUpdate({
-                ...kitten,
-                name: local.name.trim() || kitten.name,
-                emoji: local.emoji || kitten.emoji,
-                colorTag: local.colorTag,
-                description: local.description,
-                adoptionStatus: local.adoptionStatus,
-                adopter: {
-                  name: local.adopterName,
-                  email: local.adopterEmail,
-                  phone: local.adopterPhone,
-                  notes: local.adopterNotes,
-                },
-              })
-            }
-          >
-            Save profile
-          </Button>
-          {adopterVisible && !local.adopterName.trim() && (
-            <div className="flex items-center gap-2 rounded-2xl border bg-background/60 px-3 py-2 text-xs text-muted-foreground">
-              <AlertTriangle className="h-4 w-4" />
-              Status is {local.adoptionStatus} — consider adding an adopter name.
-            </div>
-          )}
-        </div>
-
-        <Separator />
-
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-          <MiniStat label="Latest weight" value={lastVal == null ? "—" : `${fmt(lastVal, unit === "g" ? 1 : 2)} ${unit}`} sub={last?.date || ""} />
-          <MiniStat label="Age at latest" value={ageDays == null ? "—" : `${ageDays} days`} sub={`born ${litterBirthDateISO}`} />
-          <MiniStat label="Change since last" value={delta == null ? "—" : `${delta >= 0 ? "+" : ""}${fmt(delta, unit === "g" ? 1 : 2)} ${unit}`} sub={prev ? `${prev.date} → ${last?.date || ""}` : ""} />
-          <MiniStat label="Avg gain / day" value={deltaPerDay == null ? "—" : `${fmt(deltaPerDay, unit === "g" ? 1 : 3)} ${unit}/day`} sub="(between last two weigh-ins)" />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function MiniStat({ label, value, sub }) {
-  return (
-    <Card className="rounded-3xl">
-      <CardContent className="p-4">
-        <div className="text-xs text-muted-foreground">{label}</div>
-        <div className="mt-1 text-xl font-semibold">{value}</div>
-        <div className="mt-1 text-xs text-muted-foreground">{sub}</div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function WeighInsTable({ kitten, unit, litterBirthDateISO, onAdd, onDelete }) {
-  const [dateISO, setDateISO] = useState(() => nextISODateFromLast(kitten.weighIns));
-  const [value, setValue] = useState("");
-
-  useEffect(() => {
-    setDateISO(nextISODateFromLast(kitten.weighIns));
-    setValue("");
-  }, [kitten.id]);
-
-  const rows = useMemo(() => sortWeighIns(kitten.weighIns), [kitten.weighIns]);
-
-  return (
-    <Card className="rounded-3xl">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">Weigh-ins for {kitten.emoji || "🐾"} {kitten.name}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
-          <div className="grid gap-2">
-            <Label>Date</Label>
-            <Input type="date" value={dateISO} onChange={(e) => setDateISO(e.target.value)} className="rounded-2xl" />
-          </div>
-          <div className="grid gap-2 md:col-span-2">
-            <Label>Weight ({unit})</Label>
-            <Input inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} placeholder={unit === "g" ? "e.g., 210" : "e.g., 7.13"} className="rounded-2xl" />
-          </div>
-          <div className="flex items-end">
-            <Button
-              className="w-full rounded-2xl"
-              onClick={() => {
-                onAdd(dateISO, value);
-                setValue("");
-                setDateISO(nextISODateFromLast([...kitten.weighIns, { date: dateISO, valueOz: 0 }]));
-              }}
-            >
-              Save weigh-in
-            </Button>
-          </div>
-        </div>
-
-        <div className="overflow-hidden rounded-3xl border">
-          <div className="grid grid-cols-14 bg-muted px-3 py-2 text-xs text-muted-foreground">
-            <div className="col-span-5">Date</div>
-            <div className="col-span-3">Age (days)</div>
-            <div className="col-span-4">Weight</div>
-            <div className="col-span-2 text-right">Actions</div>
-          </div>
-          <div className="divide-y">
-            {rows.length === 0 && <div className="px-3 py-4 text-sm text-muted-foreground">No weigh-ins yet.</div>}
-            {rows.map((w) => {
-              const v = getValueInUnit(w, unit);
-              const ageDays = Math.max(0, dayDiffISO(litterBirthDateISO, w.date));
-              return (
-                <div key={w.date} className="grid grid-cols-14 items-center px-3 py-2">
-                  <div className="col-span-5 text-sm">{w.date}</div>
-                  <div className="col-span-3 text-sm text-muted-foreground">{ageDays}</div>
-                  <div className="col-span-4 text-sm">{fmt(v, unit === "g" ? 1 : 3)} {unit}</div>
-                  <div className="col-span-2 flex justify-end">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="rounded-2xl"
-                      onClick={() => {
-                        if (confirm(`Delete weigh-in on ${w.date} for ${kitten.name}?`)) onDelete(w.date);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function NotesMilestones({ kitten, onUpdate }) {
-  const [notes, setNotes] = useState(kitten.notes || "");
-  const [milestoneText, setMilestoneText] = useState("");
-  const [milestoneDate, setMilestoneDate] = useState(new Date().toISOString().slice(0, 10));
-
-  useEffect(() => {
-    setNotes(kitten.notes || "");
-  }, [kitten.id]);
-
-  const milestones = useMemo(() => {
-    const ms = Array.isArray(kitten.milestones) ? kitten.milestones : [];
-    return [...ms].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-  }, [kitten.milestones]);
-
-  return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <Card className="rounded-3xl">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Notes</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Personality, feeding notes, meds, litter training, etc." className="min-h-[220px] rounded-2xl" />
-          <Button className="rounded-2xl" onClick={() => onUpdate({ ...kitten, notes })}>Save notes</Button>
-        </CardContent>
-      </Card>
-
-      <Card className="rounded-3xl">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Milestones</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-            <div className="grid gap-2 md:col-span-1">
-              <Label>Date</Label>
-              <Input type="date" value={milestoneDate} onChange={(e) => setMilestoneDate(e.target.value)} className="rounded-2xl" />
-            </div>
-            <div className="grid gap-2 md:col-span-2">
-              <Label>Milestone</Label>
-              <Input value={milestoneText} onChange={(e) => setMilestoneText(e.target.value)} placeholder="Eyes open, first purr, first solid food, dewormed, vaccine, etc." className="rounded-2xl" />
-            </div>
-          </div>
-
-          <Button
-            className="rounded-2xl"
-            onClick={() => {
-              const text = milestoneText.trim();
-              if (!text) return;
-              const next = [...(kitten.milestones || []), { date: milestoneDate, text }];
-              onUpdate({ ...kitten, milestones: next });
-              setMilestoneText("");
-            }}
-          >
-            Add milestone
-          </Button>
-
-          <Separator />
-
-          <div className="space-y-2">
-            {milestones.length === 0 && <div className="text-sm text-muted-foreground">No milestones yet.</div>}
-            {milestones.map((m, idx) => (
-              <div key={idx} className="flex items-start justify-between gap-2 rounded-2xl border px-3 py-2">
-                <div>
-                  <div className="text-xs text-muted-foreground">{m.date}</div>
-                  <div className="text-sm">{m.text}</div>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="rounded-2xl"
-                  onClick={() => {
-                    if (confirm("Delete this milestone?")) {
-                      const next = (kitten.milestones || []).filter((_, i) => i !== idx);
-                      onUpdate({ ...kitten, milestones: next });
-                    }
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function SettingsCard({ state, setState }) {
-  const s = state.settings;
-  const [expected, setExpected] = useState(String(s.expectedGainGPerDay));
-  const [noGainDays, setNoGainDays] = useState(String(s.alertIfNoGainDays));
-  const [lossPct, setLossPct] = useState(String(s.alertIfLossPercent));
-  const [showHelp, setShowHelp] = useState(true);
-
-  return (
-    <Card className="rounded-3xl">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">Settings</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center justify-between rounded-2xl border px-3 py-2">
-          <div>
-            <div className="text-sm font-medium">Show helper text</div>
-            <div className="text-xs text-muted-foreground">Keeps the app extra friendly for new helpers</div>
-          </div>
-          <Switch checked={showHelp} onCheckedChange={setShowHelp} />
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <div className="grid gap-2">
-            <Label>Flag if gain below (g/day)</Label>
-            <Input value={expected} onChange={(e) => setExpected(e.target.value)} className="rounded-2xl" />
-          </div>
-          <div className="grid gap-2">
-            <Label>Flag if no gain for (days)</Label>
-            <Input value={noGainDays} onChange={(e) => setNoGainDays(e.target.value)} className="rounded-2xl" />
-          </div>
-          <div className="grid gap-2">
-            <Label>Flag if loss exceeds (%)</Label>
-            <Input value={lossPct} onChange={(e) => setLossPct(e.target.value)} className="rounded-2xl" />
-          </div>
-        </div>
-
-        {showHelp && (
-          <div className="rounded-2xl border px-3 py-2 text-xs text-muted-foreground">
-            These thresholds are just to draw attention to trend changes. Kittens are individuals; always use your best judgement (and a vet if needed).
-          </div>
-        )}
-
-        <div className="flex flex-wrap gap-2">
-          <Button
-            className="rounded-2xl"
-            onClick={() => {
-              const next = {
-                expectedGainGPerDay: Math.max(0, Number(expected) || 0),
-                alertIfNoGainDays: Math.max(1, Number(noGainDays) || 1),
-                alertIfLossPercent: Math.max(0, Number(lossPct) || 0),
-              };
-              setState((st) => ({ ...st, settings: next }));
-            }}
-          >
-            Save settings
-          </Button>
-          <Button
-            variant="outline"
-            className="rounded-2xl"
-            onClick={() => {
-              if (confirm("Reset to the original data from the photo? This overwrites your current saved data.")) {
-                setState(seedState);
-              }
-            }}
-          >
-            Reset to photo data
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
