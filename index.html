@@ -1,215 +1,466 @@
-import React, { useEffect, useRef } from "react";
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kitten Growth Tracker 🐾</title>
 
-/**
- * NOTE
- * - This file is TSX/React so it will run in environments expecting /index.tsx.
- * - If you're deploying to GitHub Pages as a static site, copy the HTML version into an `index.html`.
- *   (Tell me what you’re using for deployment and I’ll give you the exact repo structure.)
- */
+  <!-- Fonts (cute + readable) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet" />
 
-export default function KittenGrowthTrackerApp() {
-  const didInit = useRef(false);
+  <!-- Chart.js (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
-  useEffect(() => {
-    // React StrictMode runs effects twice in dev; guard so we only initialize once.
-    if (didInit.current) return;
-    didInit.current = true;
+  <style>
+    :root{
+      --bg: #fff7fb;
+      --card: rgba(255,255,255,.75);
+      --ink: #1f2430;
+      --muted: rgba(31,36,48,.65);
+      --border: rgba(31,36,48,.12);
+      --shadow: 0 10px 30px rgba(31,36,48,.08);
+      --pink: #ffb7d1;
+      --mint: #baf7e6;
+      --lav: #d8c7ff;
+      --chip: rgba(255,255,255,.65);
+      --ok: #2d7a45;
+      --warn: #b15c00;
+      --bad: #a12121;
+      --radius: 22px;
+    }
+    *{ box-sizing: border-box; }
+    body{
+      margin:0;
+      font-family: Nunito, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(600px 600px at 10% 10%, var(--mint), transparent 60%),
+        radial-gradient(700px 700px at 90% 20%, var(--lav), transparent 60%),
+        radial-gradient(700px 700px at 40% 110%, var(--pink), transparent 60%),
+        linear-gradient(180deg, var(--bg), #ffffff);
+      min-height: 100vh;
+      padding: 22px 16px 40px;
+    }
+    .container{ max-width: 1100px; margin: 0 auto; }
+    .shell{
+      position: relative;
+      border: 1px solid var(--border);
+      border-radius: 32px;
+      background: rgba(255,255,255,.6);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .shell:before{
+      content:"";
+      position:absolute; inset:0;
+      background-image:
+        radial-gradient(circle at 20px 18px, rgba(31,36,48,.10) 0 6px, transparent 7px),
+        radial-gradient(circle at 44px 18px, rgba(31,36,48,.10) 0 6px, transparent 7px),
+        radial-gradient(circle at 32px 40px, rgba(31,36,48,.10) 0 7px, transparent 8px),
+        radial-gradient(circle at 32px 58px, rgba(31,36,48,.10) 0 10px, transparent 11px);
+      background-size: 140px 140px;
+      background-position: 10px 10px;
+      opacity: .06;
+      pointer-events:none;
+    }
+    header{
+      position: relative;
+      padding: 18px 18px 10px;
+      display:flex;
+      gap: 12px;
+      align-items:flex-start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+    h1{
+      margin:0;
+      font-family: Fredoka, Nunito, system-ui;
+      font-weight: 600;
+      letter-spacing: .2px;
+      font-size: 26px;
+      display:flex;
+      align-items:center;
+      gap: 10px;
+    }
+    .sub{ margin-top:6px; color: var(--muted); font-size: 13px; }
+    .row{ display:flex; gap:10px; flex-wrap: wrap; align-items:center; }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 8px 12px;
+      background: var(--chip);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 12px;
+      color: rgba(31,36,48,.8);
+      backdrop-filter: blur(8px);
+    }
+    .btn{
+      appearance:none;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.9);
+      border-radius: 999px;
+      padding: 9px 12px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor:pointer;
+      transition: transform .06s ease, box-shadow .2s ease;
+      box-shadow: 0 6px 18px rgba(31,36,48,.06);
+      user-select:none;
+    }
+    .btn:hover{ transform: translateY(-1px); }
+    .btn:active{ transform: translateY(0px); }
+    .btn.primary{
+      border-color: rgba(31,36,48,.16);
+      background: linear-gradient(180deg, #ffffff, rgba(255,255,255,.8));
+    }
+    .btn.pink{
+      background: linear-gradient(180deg, var(--pink), rgba(255,255,255,.85));
+      border-color: rgba(255,183,209,.7);
+    }
 
-    const ensureScript = (src: string) =>
-      new Promise<void>((resolve, reject) => {
-        const existing = document.querySelector(`script[src="${src}"]`) as HTMLScriptElement | null;
-        if (existing) {
-          if ((window as any).Chart) resolve();
-          else existing.addEventListener("load", () => resolve(), { once: true });
-          return;
-        }
-        const s = document.createElement("script");
-        s.src = src;
-        s.async = true;
-        s.onload = () => resolve();
-        s.onerror = () => reject(new Error(`Failed to load script: ${src}`));
-        document.head.appendChild(s);
-      });
+    .grid{
+      position: relative;
+      padding: 0 18px 18px;
+      display:grid;
+      gap: 14px;
+      grid-template-columns: 1.4fr .9fr;
+    }
+    @media (max-width: 980px){ .grid{ grid-template-columns: 1fr; } }
 
-    const init = async () => {
-      // Load Chart.js (CDN)
-      await ensureScript("https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js");
+    .card{
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,.75);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 24px rgba(31,36,48,.05);
+      overflow:hidden;
+    }
+    .card .head{
+      padding: 14px 14px 10px;
+      display:flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      border-bottom: 1px solid rgba(31,36,48,.06);
+      background: linear-gradient(180deg, rgba(255,255,255,.7), rgba(255,255,255,.3));
+    }
+    .card h2{ margin:0; font-size: 15px; font-family: Fredoka, Nunito, system-ui; font-weight: 600; }
+    .small{ color: var(--muted); font-size: 12px; margin-top: 4px; }
+    .card .body{ padding: 14px; }
 
-      // ---------------------------
-      // App logic (vanilla JS inside React shell)
-      // ---------------------------
-      const STORAGE_KEY = "kitten-growth-tracker:github-pages:v1";
-      const LITTER_BIRTHDATE_ISO = "2025-12-30";
+    .kittens{ display:grid; grid-template-columns: 1fr; gap: 10px; }
+    .krow{
+      display:flex; justify-content: space-between; gap: 10px;
+      padding: 10px 10px; border: 1px solid rgba(31,36,48,.10);
+      border-radius: 18px; background: rgba(255,255,255,.65);
+      cursor: pointer; transition: transform .06s ease, background .2s ease;
+    }
+    .krow:hover{ transform: translateY(-1px); background: rgba(255,255,255,.8); }
+    .krow.active{ outline: 2px solid rgba(31,36,48,.16); }
+    .kname{ display:flex; align-items:center; gap: 10px; }
+    .emoji{ font-size: 20px; }
+    .kmeta{ font-size: 12px; color: var(--muted); }
 
-      // Photo data (oz)
+    .badge{ font-size: 11px; font-weight: 800; padding: 5px 8px; border-radius: 999px; border: 1px solid var(--border); background: rgba(255,255,255,.8); }
+    .badge.avail{ color: var(--ok); }
+    .badge.resv{ color: var(--warn); }
+    .badge.adpt{ color: var(--bad); }
+
+    .controls{ display:flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    label{ font-size: 12px; color: rgba(31,36,48,.85); font-weight: 800; }
+    input, select, textarea{ width: 100%; border: 1px solid rgba(31,36,48,.14); border-radius: 16px; padding: 10px 12px; background: rgba(255,255,255,.75); outline: none; font-size: 13px; }
+    textarea{ resize: vertical; min-height: 88px; }
+
+    .two{ display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 720px){ .two{ grid-template-columns: 1fr; } }
+
+    .tabs{ display:flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+    .tabbar{ display:flex; gap: 6px; flex-wrap: wrap; border: 1px solid rgba(31,36,48,.10); border-radius: 999px; padding: 6px; background: rgba(255,255,255,.6); }
+    .tabbtn{ border: none; background: transparent; padding: 8px 10px; border-radius: 999px; font-weight: 900; font-size: 12px; cursor:pointer; color: rgba(31,36,48,.7); }
+    .tabbtn.active{ background: rgba(31,36,48,.08); color: rgba(31,36,48,.95); }
+
+    .charts{ display:grid; grid-template-columns: 1fr; gap: 12px; }
+    .chartWrap{ height: 320px; }
+    .chartWrap.short{ height: 260px; }
+
+    .hint{ font-size: 12px; color: var(--muted); background: rgba(255,255,255,.6); border: 1px dashed rgba(31,36,48,.16); border-radius: 18px; padding: 10px 12px; }
+
+    table{ width: 100%; border-collapse: collapse; overflow:hidden; border-radius: 18px; border: 1px solid rgba(31,36,48,.10); background: rgba(255,255,255,.6); }
+    th, td{ padding: 10px 10px; text-align:left; font-size: 13px; }
+    th{ font-size: 12px; color: var(--muted); font-weight: 900; background: rgba(31,36,48,.03); }
+    tr+tr td{ border-top: 1px solid rgba(31,36,48,.06); }
+
+    .footer{ padding: 14px 18px 18px; color: var(--muted); font-size: 12px; }
+    .kheader{ display:flex; align-items:center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .bigEmoji{ font-size: 30px; }
+
+    .statRow{ display:grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    @media (max-width: 900px){ .statRow{ grid-template-columns: repeat(2, 1fr); } }
+    .stat{ border: 1px solid rgba(31,36,48,.10); border-radius: 18px; background: rgba(255,255,255,.7); padding: 10px 12px; }
+    .stat .t{ font-size: 11px; color: var(--muted); font-weight: 900; }
+    .stat .v{ margin-top: 4px; font-size: 18px; font-family: Fredoka, Nunito, system-ui; }
+    .stat .s{ margin-top: 2px; font-size: 11px; color: var(--muted); }
+
+    .miniActions{ display:flex; gap: 8px; flex-wrap: wrap; }
+    .fileInput{ display:none; }
+
+    dialog{
+      border: none;
+      border-radius: 22px;
+      padding: 0;
+      width: min(520px, 92vw);
+      box-shadow: 0 10px 30px rgba(31,36,48,.08);
+    }
+    dialog::backdrop{ background: rgba(31,36,48,.22); }
+    .dialogInner{
+      padding: 14px;
+      background: rgba(255,255,255,.96);
+      border: 1px solid rgba(31,36,48,.14);
+      border-radius: 22px;
+    }
+
+    /* Tiny cute touch: subtle paw cursor */
+    .btn, .krow, .tabbtn{ cursor: pointer; }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="shell">
+      <header>
+        <div>
+          <h1>Kitten Growth Tracker <span aria-hidden>🐾</span></h1>
+          <div class="sub">Static HTML • saved in your browser • multiple charts • adopter tracking • live age ticker</div>
+        </div>
+
+        <div class="row">
+          <span class="pill" title="Litter age updates every second"><span aria-hidden>⏱️</span> Litter age: <span id="ageTicker" style="font-weight:900;">—</span></span>
+          <span class="pill" title="Born date"><span aria-hidden>🎂</span> Born: <span id="bornDate">—</span></span>
+
+          <button class="btn" id="exportBtn" title="Download your data as JSON">⬇️ Export</button>
+          <label class="btn" title="Import a previously exported JSON">⬆️ Import
+            <input class="fileInput" id="importFile" type="file" accept="application/json" />
+          </label>
+          <button class="btn pink" id="resetBtn" title="Reset back to the original photo data">🧼 Reset</button>
+        </div>
+      </header>
+
+      <div class="grid">
+        <div class="card">
+          <div class="head">
+            <div>
+              <h2>Charts (pick a tab!)</h2>
+              <div class="small">Hover for details • toggle “All kittens” vs selected • swap units anytime</div>
+            </div>
+            <div class="controls">
+              <label style="width:140px;">
+                Units
+                <select id="unitSelect">
+                  <option value="oz">Ounces (oz)</option>
+                  <option value="g">Grams (g)</option>
+                </select>
+              </label>
+              <label style="display:flex; align-items:center; gap:8px; width:auto;">
+                <input id="allToggle" type="checkbox" checked /> All kittens
+              </label>
+              <label style="display:flex; align-items:center; gap:8px; width:auto;">
+                <input id="normalizeToggle" type="checkbox" /> Normalize
+              </label>
+            </div>
+          </div>
+
+          <div class="body">
+            <div class="tabs">
+              <div class="tabbar" role="tablist" aria-label="Chart tabs">
+                <button class="tabbtn active" data-tab="growth" role="tab">📈 Growth</button>
+                <button class="tabbtn" data-tab="gain" role="tab">⚡ Daily gain</button>
+                <button class="tabbtn" data-tab="avg" role="tab">✨ Litter avg</button>
+                <button class="tabbtn" data-tab="latest" role="tab">🏆 Latest weights</button>
+              </div>
+              <div class="miniActions">
+                <button class="btn primary" id="addWeighBtn" title="Add a weigh-in for the selected kitten">➕ Add weigh-in</button>
+              </div>
+            </div>
+
+            <div class="charts">
+              <div class="hint" id="chartHint">Tip: Turn on Normalize to compare growth curves (change since first weigh-in).</div>
+
+              <div class="chartWrap" id="wrap-growth"><canvas id="chartGrowth"></canvas></div>
+              <div class="chartWrap" id="wrap-gain" style="display:none;"><canvas id="chartGain"></canvas></div>
+              <div class="chartWrap short" id="wrap-avg" style="display:none;"><canvas id="chartAvg"></canvas></div>
+              <div class="chartWrap short" id="wrap-latest" style="display:none;"><canvas id="chartLatest"></canvas></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="head">
+            <div>
+              <h2>Roster</h2>
+              <div class="small">6 kittens • tap one to edit adopter + weigh-ins</div>
+            </div>
+            <label style="width:190px;">
+              Search
+              <input id="searchInput" type="text" placeholder="name, tag, adopter…" />
+            </label>
+          </div>
+          <div class="body">
+            <div class="kittens" id="kittensList"></div>
+          </div>
+        </div>
+
+        <div class="card" style="grid-column: 1 / -1;">
+          <div class="head">
+            <div class="kheader">
+              <div>
+                <h2>Selected kitten</h2>
+                <div class="small" id="selectedSub">—</div>
+              </div>
+              <div class="row">
+                <span class="pill" title="This is the currently selected kitten"><span aria-hidden>🐾</span> <span id="selectedNamePill">—</span></span>
+              </div>
+            </div>
+          </div>
+          <div class="body" id="selectedPanel"></div>
+        </div>
+      </div>
+
+      <div class="footer">Made for cozy kitten season. Export your JSON occasionally so you can hand adopters a sweet history. 💖</div>
+    </div>
+  </div>
+
+  <dialog id="weighDialog">
+    <form method="dialog" class="dialogInner">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <div style="font-family: Fredoka, Nunito; font-size: 16px; font-weight: 600;">Add weigh-in</div>
+        <button class="btn" value="cancel" aria-label="Close">✖</button>
+      </div>
+      <div style="margin-top: 10px;" class="two">
+        <div>
+          <label>Date</label>
+          <input type="date" id="weighDate" />
+        </div>
+        <div>
+          <label>Weight (<span id="weighUnit">oz</span>)</label>
+          <input type="text" inputmode="decimal" id="weighValue" placeholder="e.g., 7.13" />
+        </div>
+      </div>
+      <div class="hint" style="margin-top:10px;">If you already weighed on that date, this will update it.</div>
+      <div style="margin-top:10px; display:flex; gap:10px; justify-content:flex-end;">
+        <button class="btn" value="cancel">Cancel</button>
+        <button class="btn pink" id="weighSave" value="default">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    // =========================
+    // Expected behavior
+    // - This should run as a single-file static site on GitHub Pages.
+    // - It should render charts + roster, persist edits in localStorage,
+    //   show a continuously updating litter age since 2025-12-30.
+    // =========================
+
+    (function(){
+      'use strict';
+
+      if (!window.Chart) {
+        alert('Chart.js failed to load. If you are offline, the charts will not render.');
+        console.error('Chart.js not found on window.');
+      }
+
+      const STORAGE_KEY = 'kitten-growth-tracker:github-pages:v1';
+      const LITTER_BIRTHDATE_ISO = '2025-12-30';
+
+      // Seed data from your photo (oz)
       const SEED = {
-        unit: "oz",
+        unit: 'oz',
         litterBirthDateISO: LITTER_BIRTHDATE_ISO,
         kittens: [
-          {
-            id: "orange",
-            name: "Orange",
-            emoji: "🐱",
-            tag: "Orange",
-            description: "",
-            status: "Available",
-            adopter: { name: "", email: "", phone: "", notes: "" },
-            notes: "",
-            milestones: [],
-            weighIns: [
-              { date: "2026-01-01", oz: 4.88 },
-              { date: "2026-01-03", oz: 6.03 },
-              { date: "2026-01-05", oz: 7.13 },
-            ],
-          },
-          {
-            id: "blackie",
-            name: "Blackie",
-            emoji: "🐈‍⬛",
-            tag: "Black",
-            description: "",
-            status: "Available",
-            adopter: { name: "", email: "", phone: "", notes: "" },
-            notes: "",
-            milestones: [],
-            weighIns: [
-              { date: "2026-01-01", oz: 3.877 },
-              { date: "2026-01-03", oz: 5.407 },
-              { date: "2026-01-05", oz: 6.63 },
-            ],
-          },
-          {
-            id: "tux",
-            name: "Tux",
-            emoji: "🎩",
-            tag: "Tux",
-            description: "",
-            status: "Available",
-            adopter: { name: "", email: "", phone: "", notes: "" },
-            notes: "",
-            milestones: [],
-            weighIns: [
-              { date: "2026-01-01", oz: 5.255 },
-              { date: "2026-01-03", oz: 6.49 },
-              { date: "2026-01-05", oz: 7.5 },
-            ],
-          },
-          {
-            id: "tux2",
-            name: "Tux 2",
-            emoji: "🧦",
-            tag: "Tux",
-            description: "White stripe on left leg",
-            status: "Available",
-            adopter: { name: "", email: "", phone: "", notes: "" },
-            notes: "",
-            milestones: [],
-            weighIns: [
-              { date: "2026-01-01", oz: 5.04 },
-              { date: "2026-01-03", oz: 6.48 },
-              { date: "2026-01-05", oz: 7.17 },
-            ],
-          },
-          {
-            id: "tortie",
-            name: "Tortie",
-            emoji: "🍂",
-            tag: "Tortie",
-            description: "",
-            status: "Available",
-            adopter: { name: "", email: "", phone: "", notes: "" },
-            notes: "",
-            milestones: [],
-            weighIns: [
-              { date: "2026-01-01", oz: 4.38 },
-              { date: "2026-01-03", oz: 5.65 },
-              { date: "2026-01-05", oz: 7.0 },
-            ],
-          },
-          {
-            id: "calico",
-            name: "Calico",
-            emoji: "🌸",
-            tag: "Calico",
-            description: "",
-            status: "Available",
-            adopter: { name: "", email: "", phone: "", notes: "" },
-            notes: "",
-            milestones: [],
-            weighIns: [
-              { date: "2026-01-01", oz: 4.504 },
-              { date: "2026-01-03", oz: 6.1 },
-              { date: "2026-01-05", oz: 7.06 },
-            ],
-          },
-        ],
-      } as const;
+          { id:'orange', name:'Orange', emoji:'🐱', tag:'Orange', description:'', status:'Available', adopter:{name:'',email:'',phone:'',notes:''}, notes:'', milestones:[], weighIns:[
+            {date:'2026-01-01', oz:4.88},{date:'2026-01-03', oz:6.03},{date:'2026-01-05', oz:7.13},
+          ]},
+          { id:'blackie', name:'Blackie', emoji:'🐈‍⬛', tag:'Black', description:'', status:'Available', adopter:{name:'',email:'',phone:'',notes:''}, notes:'', milestones:[], weighIns:[
+            {date:'2026-01-01', oz:3.877},{date:'2026-01-03', oz:5.407},{date:'2026-01-05', oz:6.63},
+          ]},
+          { id:'tux', name:'Tux', emoji:'🎩', tag:'Tux', description:'', status:'Available', adopter:{name:'',email:'',phone:'',notes:''}, notes:'', milestones:[], weighIns:[
+            {date:'2026-01-01', oz:5.255},{date:'2026-01-03', oz:6.49},{date:'2026-01-05', oz:7.5},
+          ]},
+          { id:'tux2', name:'Tux 2', emoji:'🧦', tag:'Tux', description:'White stripe on left leg', status:'Available', adopter:{name:'',email:'',phone:'',notes:''}, notes:'', milestones:[], weighIns:[
+            {date:'2026-01-01', oz:5.04},{date:'2026-01-03', oz:6.48},{date:'2026-01-05', oz:7.17},
+          ]},
+          { id:'tortie', name:'Tortie', emoji:'🍂', tag:'Tortie', description:'', status:'Available', adopter:{name:'',email:'',phone:'',notes:''}, notes:'', milestones:[], weighIns:[
+            {date:'2026-01-01', oz:4.38},{date:'2026-01-03', oz:5.65},{date:'2026-01-05', oz:7.0},
+          ]},
+          { id:'calico', name:'Calico', emoji:'🌸', tag:'Calico', description:'', status:'Available', adopter:{name:'',email:'',phone:'',notes:''}, notes:'', milestones:[], weighIns:[
+            {date:'2026-01-01', oz:4.504},{date:'2026-01-03', oz:6.1},{date:'2026-01-05', oz:7.06},
+          ]},
+        ]
+      };
 
-      const deepClone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
+      const deepClone = (x) => JSON.parse(JSON.stringify(x));
+      const sortWeighIns = (ws) => [...ws].sort((a,b) => String(a.date).localeCompare(String(b.date)));
 
-      const sortWeighIns = (ws: any[]) => [...ws].sort((a, b) => String(a.date).localeCompare(String(b.date)));
-
-      const loadState = () => {
-        try {
+      function loadState(){
+        try{
           const raw = localStorage.getItem(STORAGE_KEY);
-          if (!raw) return deepClone(SEED);
+          if(!raw) return deepClone(SEED);
           const incoming = JSON.parse(raw);
-          const merged: any = deepClone(SEED);
-          if (incoming && typeof incoming === "object") {
-            merged.unit = incoming.unit === "g" ? "g" : "oz";
+          const merged = deepClone(SEED);
+          if(incoming && typeof incoming === 'object'){
+            merged.unit = incoming.unit === 'g' ? 'g' : 'oz';
             merged.litterBirthDateISO = incoming.litterBirthDateISO || merged.litterBirthDateISO;
-            const byId = new Map((incoming.kittens || []).map((k: any) => [k.id, k]));
-            merged.kittens = merged.kittens.map((k: any) => {
+            const byId = new Map((incoming.kittens || []).map(k => [k.id, k]));
+            merged.kittens = merged.kittens.map(k => {
               const inc = byId.get(k.id);
-              if (!inc) return k;
+              if(!inc) return k;
               return {
                 ...k,
                 ...inc,
                 id: k.id,
                 adopter: { ...k.adopter, ...(inc.adopter || {}) },
                 weighIns: sortWeighIns(Array.isArray(inc.weighIns) ? inc.weighIns : k.weighIns),
-                milestones: Array.isArray(inc.milestones) ? inc.milestones : k.milestones || [],
+                milestones: Array.isArray(inc.milestones) ? inc.milestones : (k.milestones || [])
               };
             });
           }
           return merged;
-        } catch {
+        }catch(e){
+          console.warn('Failed to load state, using seed.', e);
           return deepClone(SEED);
         }
-      };
+      }
 
-      let state: any = loadState();
-      let selectedId: string = state.kittens[0]?.id || "orange";
+      let state = loadState();
+      let selectedId = (state.kittens[0] && state.kittens[0].id) ? state.kittens[0].id : 'orange';
 
-      const saveState = () => {
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-        } catch {
-          // ignore
-        }
-      };
+      function saveState(){
+        try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){ /* ignore */ }
+      }
 
-      // ---------------------------
       // Utilities
-      // ---------------------------
-      const ozToG = (oz: number) => oz * 28.349523125;
-      const gToOz = (g: number) => g / 28.349523125;
+      const ozToG = (oz) => oz * 28.349523125;
+      const gToOz = (g) => g / 28.349523125;
 
-      const fmt = (n: any, digits: number) => {
-        if (n == null || Number.isNaN(n)) return "—";
+      const fmt = (n, digits) => {
+        if(n == null || Number.isNaN(n)) return '—';
         const d = Math.max(0, Math.min(6, digits ?? 2));
         return Number(n).toFixed(d);
       };
 
-      const dayDiffISO = (aISO: string, bISO: string) => {
-        const a = new Date(aISO + "T00:00:00");
-        const b = new Date(bISO + "T00:00:00");
-        return Math.round((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24));
+      const dayDiffISO = (aISO, bISO) => {
+        const a = new Date(aISO + 'T00:00:00');
+        const b = new Date(bISO + 'T00:00:00');
+        return Math.round((b.getTime() - a.getTime()) / (1000*60*60*24));
       };
 
-      const msSinceISOStart = (iso: string) => Date.now() - new Date(iso + "T00:00:00").getTime();
+      const msSinceISOStart = (iso) => Date.now() - new Date(iso + 'T00:00:00').getTime();
 
-      const formatAge = (ms: number) => {
+      const formatAge = (ms) => {
         const s = Math.max(0, Math.floor(ms / 1000));
         const days = Math.floor(s / 86400);
         const hrs = Math.floor((s % 86400) / 3600);
@@ -219,124 +470,125 @@ export default function KittenGrowthTrackerApp() {
       };
 
       const allDates = () => {
-        const set = new Set<string>();
-        state.kittens.forEach((k: any) => (k.weighIns || []).forEach((w: any) => set.add(w.date)));
+        const set = new Set();
+        state.kittens.forEach(k => (k.weighIns || []).forEach(w => set.add(w.date)));
         return Array.from(set).sort();
       };
 
-      const getVal = (w: any) => {
-        if (!w) return null;
-        return state.unit === "g" ? ozToG(w.oz) : w.oz;
+      const getVal = (w) => {
+        if(!w) return null;
+        return state.unit === 'g' ? ozToG(w.oz) : w.oz;
       };
 
-      const ensureAdopter = (k: any) => {
-        if (!k.adopter) k.adopter = { name: "", email: "", phone: "", notes: "" };
+      const ensureAdopter = (k) => {
+        if(!k.adopter) k.adopter = { name:'', email:'', phone:'', notes:'' };
         return k;
       };
 
-      const latestWeighIn = (k: any) => {
+      const latestWeighIn = (k) => {
         const s = sortWeighIns(k.weighIns || []);
         return s.length ? s[s.length - 1] : null;
       };
 
-      const prevWeighIn = (k: any) => {
+      const prevWeighIn = (k) => {
         const s = sortWeighIns(k.weighIns || []);
         return s.length >= 2 ? s[s.length - 2] : null;
       };
 
-      const kittenMatches = (k: any, q: string) => {
-        if (!q) return true;
+      const kittenMatches = (k, q) => {
+        if(!q) return true;
         const t = q.toLowerCase();
-        return [k.name, k.tag, k.description, k.status, k.adopter?.name]
-          .some((v) => String(v || "").toLowerCase().includes(t));
+        return [k.name, k.tag, k.description, k.status, (k.adopter && k.adopter.name)]
+          .some(v => String(v || '').toLowerCase().includes(t));
       };
 
-      const statusBadge = (status: string) => {
-        const s = status || "Available";
-        const cls = s === "Adopted" ? "adpt" : s === "Reserved" ? "resv" : "avail";
+      const statusBadge = (status) => {
+        const s = status || 'Available';
+        const cls = s === 'Adopted' ? 'adpt' : (s === 'Reserved' ? 'resv' : 'avail');
         return `<span class="badge ${cls}">${s}</span>`;
       };
 
-      // ---------------------------
+      const escapeHtml = (str) => String(str || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+
       // DOM refs
-      // ---------------------------
-      const bornDateEl = document.getElementById("bornDate");
-      const ageTickerEl = document.getElementById("ageTicker");
-      const unitSelect = document.getElementById("unitSelect") as HTMLSelectElement | null;
-      const allToggle = document.getElementById("allToggle") as HTMLInputElement | null;
-      const normalizeToggle = document.getElementById("normalizeToggle") as HTMLInputElement | null;
-      const kittensList = document.getElementById("kittensList");
-      const searchInput = document.getElementById("searchInput") as HTMLInputElement | null;
-      const selectedPanel = document.getElementById("selectedPanel");
-      const selectedSub = document.getElementById("selectedSub");
-      const selectedNamePill = document.getElementById("selectedNamePill");
-      const exportBtn = document.getElementById("exportBtn");
-      const importFile = document.getElementById("importFile") as HTMLInputElement | null;
-      const resetBtn = document.getElementById("resetBtn");
-      const addWeighBtn = document.getElementById("addWeighBtn");
+      const bornDateEl = document.getElementById('bornDate');
+      const ageTickerEl = document.getElementById('ageTicker');
+      const unitSelect = document.getElementById('unitSelect');
+      const allToggle = document.getElementById('allToggle');
+      const normalizeToggle = document.getElementById('normalizeToggle');
+      const kittensList = document.getElementById('kittensList');
+      const searchInput = document.getElementById('searchInput');
+      const selectedPanel = document.getElementById('selectedPanel');
+      const selectedSub = document.getElementById('selectedSub');
+      const selectedNamePill = document.getElementById('selectedNamePill');
+      const exportBtn = document.getElementById('exportBtn');
+      const importFile = document.getElementById('importFile');
+      const resetBtn = document.getElementById('resetBtn');
+      const addWeighBtn = document.getElementById('addWeighBtn');
 
-      const weighDialog = document.getElementById("weighDialog") as HTMLDialogElement | null;
-      const weighDate = document.getElementById("weighDate") as HTMLInputElement | null;
-      const weighValue = document.getElementById("weighValue") as HTMLInputElement | null;
-      const weighUnit = document.getElementById("weighUnit");
+      const weighDialog = document.getElementById('weighDialog');
+      const weighDate = document.getElementById('weighDate');
+      const weighValue = document.getElementById('weighValue');
+      const weighUnit = document.getElementById('weighUnit');
 
-      const tabButtons = Array.from(document.querySelectorAll(".tabbtn"));
-      const wraps: Record<string, HTMLElement | null> = {
-        growth: document.getElementById("wrap-growth"),
-        gain: document.getElementById("wrap-gain"),
-        avg: document.getElementById("wrap-avg"),
-        latest: document.getElementById("wrap-latest"),
+      const tabButtons = Array.from(document.querySelectorAll('.tabbtn'));
+      const wraps = {
+        growth: document.getElementById('wrap-growth'),
+        gain: document.getElementById('wrap-gain'),
+        avg: document.getElementById('wrap-avg'),
+        latest: document.getElementById('wrap-latest'),
       };
 
-      if (!bornDateEl || !ageTickerEl || !unitSelect || !allToggle || !normalizeToggle || !kittensList || !searchInput || !selectedPanel || !selectedSub || !selectedNamePill || !exportBtn || !importFile || !resetBtn || !addWeighBtn || !weighDialog || !weighDate || !weighValue || !weighUnit) {
-        // If the host environment changed the DOM, fail loudly with a helpful message.
-        // eslint-disable-next-line no-console
-        console.error("Kitten tracker: missing required DOM nodes. Did the markup change?");
-        return;
+      function assertDom(){
+        const required = [bornDateEl, ageTickerEl, unitSelect, allToggle, normalizeToggle, kittensList, searchInput, selectedPanel, selectedSub, selectedNamePill, exportBtn, importFile, resetBtn, addWeighBtn, weighDialog, weighDate, weighValue, weighUnit];
+        if(required.some(x => !x)){
+          console.error('Kitten tracker: missing required DOM nodes. Did the markup change?');
+          alert('Something is missing in the HTML. Open the console for details.');
+          return false;
+        }
+        return true;
       }
+      if(!assertDom()) return;
 
-      // ---------------------------
       // Charts
-      // ---------------------------
-      const Chart = (window as any).Chart;
-      const palette: Record<string, string> = {
-        orange: "#ff8a3d",
-        blackie: "#2f3542",
-        tux: "#4b5563",
-        tux2: "#64748b",
-        tortie: "#b45309",
-        calico: "#db2777",
+      const palette = {
+        orange: '#ff8a3d',
+        blackie: '#2f3542',
+        tux: '#4b5563',
+        tux2: '#64748b',
+        tortie: '#b45309',
+        calico: '#db2777'
       };
 
-      let chartGrowth: any, chartGain: any, chartAvg: any, chartLatest: any;
+      let chartGrowth, chartGain, chartAvg, chartLatest;
 
-      const getVisibleKittens = () => {
-        const all = allToggle.checked;
-        return all ? state.kittens : state.kittens.filter((k: any) => k.id === selectedId);
-      };
+      const getVisibleKittens = () => (allToggle.checked ? state.kittens : state.kittens.filter(k => k.id === selectedId));
 
       const buildGrowthData = () => {
         const dates = allDates();
-        const labels = dates.map((d) => {
+        const labels = dates.map(d => {
           const ageDays = Math.max(0, dayDiffISO(state.litterBirthDateISO, d));
           return `${d} (day ${ageDays})`;
         });
-
         const normalize = normalizeToggle.checked;
-        const datasets = getVisibleKittens().map((k: any) => {
-          const map = new Map((k.weighIns || []).map((w: any) => [w.date, w]));
-          const vals = dates.map((d) => {
+        const datasets = getVisibleKittens().map(k => {
+          const map = new Map((k.weighIns || []).map(w => [w.date, w]));
+          const vals = dates.map(d => {
             const w = map.get(d);
             return w ? getVal(w) : null;
           });
-          const first = vals.find((v) => v != null);
-          const y = normalize && first != null ? vals.map((v) => (v == null ? null : v - first)) : vals;
-
+          const first = vals.find(v => v != null);
+          const y = (normalize && first != null) ? vals.map(v => (v == null ? null : v - first)) : vals;
           return {
-            label: `${k.emoji || "🐾"} ${k.name}`,
+            label: `${k.emoji || '🐾'} ${k.name}`,
             data: y,
-            borderColor: palette[k.id] || "#111827",
-            backgroundColor: palette[k.id] || "#111827",
+            borderColor: palette[k.id] || '#111827',
+            backgroundColor: palette[k.id] || '#111827',
             borderWidth: k.id === selectedId ? 3 : 2,
             pointRadius: k.id === selectedId ? 4 : 3,
             pointHoverRadius: 5,
@@ -344,116 +596,97 @@ export default function KittenGrowthTrackerApp() {
             spanGaps: true,
           };
         });
-
         const yLabel = normalize ? `Δ weight (${state.unit})` : `Weight (${state.unit})`;
         return { labels, datasets, yLabel };
       };
 
       const buildGainData = () => {
         const dates = allDates();
-        const labels = dates.map((d) => {
+        const labels = dates.map(d => {
           const ageDays = Math.max(0, dayDiffISO(state.litterBirthDateISO, d));
           return `${d} (day ${ageDays})`;
         });
-
-        const datasets = getVisibleKittens().map((k: any) => {
+        const datasets = getVisibleKittens().map(k => {
           const s = sortWeighIns(k.weighIns || []);
-          const byDate = new Map(s.map((w: any) => [w.date, w]));
-
-          let prevDate: string | null = null;
-          let prevOz: number | null = null;
-
-          const data = dates.map((d) => {
+          const byDate = new Map(s.map(w => [w.date, w]));
+          let prevDate = null;
+          let prevOz = null;
+          const data = dates.map(d => {
             const w = byDate.get(d);
-            if (!w) return null;
-            if (prevDate == null || prevOz == null) {
-              prevDate = d;
-              prevOz = w.oz;
-              return null;
+            if(!w) return null;
+            if(prevDate == null || prevOz == null){
+              prevDate = d; prevOz = w.oz; return null;
             }
             const days = Math.max(1, dayDiffISO(prevDate, d));
             const perDayOz = (w.oz - prevOz) / days;
-            prevDate = d;
-            prevOz = w.oz;
-            return state.unit === "g" ? ozToG(perDayOz) : perDayOz;
+            prevDate = d; prevOz = w.oz;
+            return state.unit === 'g' ? ozToG(perDayOz) : perDayOz;
           });
-
           return {
-            label: `${k.emoji || "🐾"} ${k.name}`,
+            label: `${k.emoji || '🐾'} ${k.name}`,
             data,
-            borderColor: palette[k.id] || "#111827",
-            backgroundColor: palette[k.id] || "#111827",
+            borderColor: palette[k.id] || '#111827',
+            backgroundColor: palette[k.id] || '#111827',
             borderWidth: k.id === selectedId ? 3 : 2,
             pointRadius: 0,
             tension: 0.25,
             spanGaps: true,
           };
         });
-
         return { labels, datasets, yLabel: `${state.unit}/day` };
       };
 
       const buildAvgData = () => {
         const dates = allDates();
-        const labels = dates.map((d) => {
+        const labels = dates.map(d => {
           const ageDays = Math.max(0, dayDiffISO(state.litterBirthDateISO, d));
           return `${d} (day ${ageDays})`;
         });
-
-        const data = dates.map((d) => {
+        const data = dates.map(d => {
           const vals = state.kittens
-            .map((k: any) => (k.weighIns || []).find((w: any) => w.date === d))
+            .map(k => (k.weighIns || []).find(w => w.date === d))
             .filter(Boolean)
-            .map((w: any) => getVal(w));
-          if (!vals.length) return null;
-          return vals.reduce((a: number, b: number) => a + b, 0) / vals.length;
+            .map(w => getVal(w));
+          if(!vals.length) return null;
+          return vals.reduce((a,b) => a + b, 0) / vals.length;
         });
-
         return {
           labels,
-          datasets: [
-            {
-              label: "✨ Litter average",
-              data,
-              borderColor: "#7c3aed",
-              backgroundColor: "#7c3aed",
-              borderWidth: 3,
-              pointRadius: 3,
-              tension: 0.25,
-              spanGaps: true,
-            },
-          ],
-          yLabel: `Avg (${state.unit})`,
+          datasets: [{
+            label: '✨ Litter average',
+            data,
+            borderColor: '#7c3aed',
+            backgroundColor: '#7c3aed',
+            borderWidth: 3,
+            pointRadius: 3,
+            tension: 0.25,
+            spanGaps: true,
+          }],
+          yLabel: `Avg (${state.unit})`
         };
       };
 
       const buildLatestData = () => {
         const rows = state.kittens
-          .map((k: any) => {
+          .map(k => {
             const last = latestWeighIn(k);
-            return {
-              name: `${k.emoji || "🐾"} ${k.name}`,
-              value: last ? getVal(last) : null,
-              date: last?.date || "",
-            };
+            return { name: `${k.emoji || '🐾'} ${k.name}`, value: last ? getVal(last) : null, date: last ? last.date : '' };
           })
-          .sort((a: any, b: any) => (b.value ?? -Infinity) - (a.value ?? -Infinity));
+          .sort((a,b) => (b.value ?? -Infinity) - (a.value ?? -Infinity));
 
         return {
-          labels: rows.map((r: any) => r.name),
-          datasets: [
-            {
-              label: `Latest weight (${state.unit})`,
-              data: rows.map((r: any) => r.value),
-              backgroundColor: rows.map((_: any, i: number) => ["#ff8a3d", "#db2777", "#7c3aed", "#0ea5e9", "#10b981", "#111827"][i % 6]),
-              borderRadius: 12,
-            },
-          ],
-          yLabel: `${state.unit}`,
+          labels: rows.map(r => r.name),
+          datasets: [{
+            label: `Latest weight (${state.unit})`,
+            data: rows.map(r => r.value),
+            backgroundColor: rows.map((_, i) => ['#ff8a3d','#db2777','#7c3aed','#0ea5e9','#10b981','#111827'][i % 6]),
+            borderRadius: 12,
+          }],
+          yLabel: `${state.unit}`
         };
       };
 
-      const makeChart = (canvas: HTMLCanvasElement, type: any, dataBuilder: any) => {
+      const makeChart = (canvas, type, dataBuilder) => {
         const built = dataBuilder();
         return new Chart(canvas, {
           type,
@@ -462,150 +695,125 @@ export default function KittenGrowthTrackerApp() {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-              legend: { labels: { boxWidth: 14, boxHeight: 14, font: { family: "Nunito" } } },
+              legend: { labels: { boxWidth: 14, boxHeight: 14, font: { family: 'Nunito' } } },
               tooltip: {
                 callbacks: {
-                  label: (item: any) => {
+                  label: (item) => {
                     const v = item.raw;
-                    if (v == null) return `${item.dataset.label}: —`;
-                    const digits = state.unit === "g" ? 1 : 3;
-                    return `${item.dataset.label}: ${fmt(v, digits)} ${built.yLabel.includes("/day") ? state.unit + "/day" : state.unit}`;
-                  },
-                },
-              },
+                    if(v == null) return `${item.dataset.label}: —`;
+                    const digits = state.unit === 'g' ? 1 : 3;
+                    return `${item.dataset.label}: ${fmt(v, digits)} ${built.yLabel.includes('/day') ? state.unit + '/day' : state.unit}`;
+                  }
+                }
+              }
             },
             scales: {
-              x: {
-                ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
-                grid: { color: "rgba(31,36,48,.06)" },
-              },
-              y: {
-                title: { display: true, text: built.yLabel, font: { family: "Nunito", weight: "700" } },
-                grid: { color: "rgba(31,36,48,.06)" },
-              },
-            },
-          },
+              x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }, grid: { color: 'rgba(31,36,48,.06)' } },
+              y: { title: { display: true, text: built.yLabel, font: { family: 'Nunito', weight: '700' } }, grid: { color: 'rgba(31,36,48,.06)' } }
+            }
+          }
         });
       };
 
       const rebuildCharts = () => {
-        if (chartGrowth) chartGrowth.destroy();
-        if (chartGain) chartGain.destroy();
-        if (chartAvg) chartAvg.destroy();
-        if (chartLatest) chartLatest.destroy();
+        if(chartGrowth) chartGrowth.destroy();
+        if(chartGain) chartGain.destroy();
+        if(chartAvg) chartAvg.destroy();
+        if(chartLatest) chartLatest.destroy();
 
-        const c1 = document.getElementById("chartGrowth") as HTMLCanvasElement;
-        const c2 = document.getElementById("chartGain") as HTMLCanvasElement;
-        const c3 = document.getElementById("chartAvg") as HTMLCanvasElement;
-        const c4 = document.getElementById("chartLatest") as HTMLCanvasElement;
-
-        chartGrowth = makeChart(c1, "line", buildGrowthData);
-        chartGain = makeChart(c2, "line", buildGainData);
-        chartAvg = makeChart(c3, "line", buildAvgData);
-        chartLatest = makeChart(c4, "bar", buildLatestData);
+        chartGrowth = makeChart(document.getElementById('chartGrowth'), 'line', buildGrowthData);
+        chartGain   = makeChart(document.getElementById('chartGain'),   'line', buildGainData);
+        chartAvg    = makeChart(document.getElementById('chartAvg'),    'line', buildAvgData);
+        chartLatest = makeChart(document.getElementById('chartLatest'), 'bar',  buildLatestData);
       };
 
-      // ---------------------------
-      // Rendering helpers
-      // ---------------------------
-      const escapeHtml = (str: any) =>
-        String(str || "")
-          .replaceAll("&", "&amp;")
-          .replaceAll("<", "&lt;")
-          .replaceAll(">", "&gt;")
-          .replaceAll('"', "&quot;")
-          .replaceAll("'", "&#039;");
-
+      // Render
       const renderRoster = () => {
-        const q = (searchInput.value || "").trim();
-        const list = state.kittens.filter((k: any) => kittenMatches(k, q));
+        const q = (searchInput.value || '').trim();
+        const list = state.kittens.filter(k => kittenMatches(k, q));
 
-        kittensList.innerHTML = list
-          .map((k: any) => {
-            ensureAdopter(k);
-            const last = latestWeighIn(k);
-            const prev = prevWeighIn(k);
-            const lastV = last ? getVal(last) : null;
-            const prevV = prev ? getVal(prev) : null;
-            const delta = last && prev ? lastV - prevV : null;
-            const digits = state.unit === "g" ? 1 : 3;
-            const deltaText = delta == null ? "" : `${delta >= 0 ? "+" : ""}${fmt(delta, digits)} ${state.unit}`;
+        kittensList.innerHTML = list.map(k => {
+          ensureAdopter(k);
+          const last = latestWeighIn(k);
+          const prev = prevWeighIn(k);
+          const lastV = last ? getVal(last) : null;
+          const prevV = prev ? getVal(prev) : null;
+          const delta = (last && prev) ? (lastV - prevV) : null;
+          const digits = state.unit === 'g' ? 1 : 3;
+          const deltaText = delta == null ? '' : `${delta >= 0 ? '+' : ''}${fmt(delta, digits)} ${state.unit}`;
 
-            return `
-              <div class="krow ${k.id === selectedId ? "active" : ""}" data-id="${k.id}">
-                <div>
-                  <div class="kname">
-                    <div class="emoji">${k.emoji || "🐾"}</div>
-                    <div>
-                      <div style="font-weight: 900;">${escapeHtml(k.name)}</div>
-                      <div class="kmeta">${escapeHtml(k.description ? k.description : k.tag || "")} ${
-                        k.adopter?.name && k.status !== "Available" ? `• adopter: ${escapeHtml(k.adopter.name)}` : ""
-                      }</div>
-                    </div>
-                  </div>
-                </div>
-                <div style="text-align:right; min-width: 120px;">
-                  <div>${statusBadge(k.status)}</div>
-                  <div class="kmeta" style="margin-top:4px;">
-                    ${last ? `${fmt(lastV, digits)} ${state.unit}` : "—"}
-                    ${deltaText ? `<span class="kmeta"> • ${deltaText}</span>` : ""}
+          return `
+            <div class="krow ${k.id === selectedId ? 'active' : ''}" data-id="${k.id}">
+              <div>
+                <div class="kname">
+                  <div class="emoji">${k.emoji || '🐾'}</div>
+                  <div>
+                    <div style="font-weight:900;">${escapeHtml(k.name)}</div>
+                    <div class="kmeta">${escapeHtml(k.description ? k.description : (k.tag || ''))} ${
+                      (k.adopter && k.adopter.name && k.status !== 'Available') ? `• adopter: ${escapeHtml(k.adopter.name)}` : ''
+                    }</div>
                   </div>
                 </div>
               </div>
-            `;
-          })
-          .join("");
+              <div style="text-align:right; min-width:120px;">
+                <div>${statusBadge(k.status)}</div>
+                <div class="kmeta" style="margin-top:4px;">
+                  ${last ? `${fmt(lastV, digits)} ${state.unit}` : '—'}
+                  ${deltaText ? `<span class="kmeta"> • ${deltaText}</span>` : ''}
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
 
-        Array.from(kittensList.querySelectorAll(".krow")).forEach((el) => {
-          el.addEventListener("click", () => {
-            selectedId = (el as HTMLElement).getAttribute("data-id") || selectedId;
+        Array.from(kittensList.querySelectorAll('.krow')).forEach(el => {
+          el.addEventListener('click', () => {
+            selectedId = el.getAttribute('data-id') || selectedId;
             renderAll();
           });
         });
       };
 
       const renderSelected = () => {
-        const k = state.kittens.find((x: any) => x.id === selectedId) || state.kittens[0];
+        const k = state.kittens.find(x => x.id === selectedId) || state.kittens[0];
         ensureAdopter(k);
 
-        selectedNamePill.textContent = `${k.emoji || "🐾"} ${k.name}`;
-        selectedSub.textContent = `${k.tag || ""}${k.description ? " • " + k.description : ""}`.trim() || "—";
+        selectedNamePill.textContent = `${k.emoji || '🐾'} ${k.name}`;
+        selectedSub.textContent = `${k.tag || ''}${k.description ? ' • ' + k.description : ''}`.trim() || '—';
 
         const last = latestWeighIn(k);
         const prev = prevWeighIn(k);
         const lastV = last ? getVal(last) : null;
         const prevV = prev ? getVal(prev) : null;
-        const digits = state.unit === "g" ? 1 : 3;
+        const digits = state.unit === 'g' ? 1 : 3;
 
         const ageDays = last ? Math.max(0, dayDiffISO(state.litterBirthDateISO, last.date)) : null;
-        const delta = last && prev ? lastV - prevV : null;
-        const daysBetween = last && prev ? Math.max(1, dayDiffISO(prev.date, last.date)) : null;
-        const deltaPerDay = delta != null && daysBetween != null ? delta / daysBetween : null;
+        const delta = (last && prev) ? (lastV - prevV) : null;
+        const daysBetween = (last && prev) ? Math.max(1, dayDiffISO(prev.date, last.date)) : null;
+        const deltaPerDay = (delta != null && daysBetween != null) ? (delta / daysBetween) : null;
 
-        const adopterEnabled = k.status === "Reserved" || k.status === "Adopted";
+        const adopterEnabled = (k.status === 'Reserved' || k.status === 'Adopted');
 
-        const weighRows = sortWeighIns(k.weighIns || [])
-          .map((w: any) => {
-            const v = getVal(w);
-            const ad = Math.max(0, dayDiffISO(state.litterBirthDateISO, w.date));
-            return `
-              <tr>
-                <td>${w.date}</td>
-                <td>${ad}</td>
-                <td>${fmt(v, digits)} ${state.unit}</td>
-                <td style="text-align:right;"><button class="btn" data-del="${w.date}" title="Delete weigh-in">🗑️</button></td>
-              </tr>
-            `;
-          })
-          .join("");
+        const weighRows = sortWeighIns(k.weighIns || []).map(w => {
+          const v = getVal(w);
+          const ad = Math.max(0, dayDiffISO(state.litterBirthDateISO, w.date));
+          return `
+            <tr>
+              <td>${w.date}</td>
+              <td>${ad}</td>
+              <td>${fmt(v, digits)} ${state.unit}</td>
+              <td style="text-align:right;"><button class="btn" data-del="${w.date}" title="Delete weigh-in">🗑️</button></td>
+            </tr>
+          `;
+        }).join('');
 
         selectedPanel.innerHTML = `
           <div class="kheader">
             <div class="row" style="align-items:center;">
-              <div class="bigEmoji">${k.emoji || "🐾"}</div>
+              <div class="bigEmoji">${k.emoji || '🐾'}</div>
               <div>
-                <div style="font-family: Fredoka, Nunito; font-size: 18px; font-weight: 600;">${escapeHtml(k.name)}</div>
-                <div class="small">${statusBadge(k.status)} <span style="margin-left:8px;">tag: ${escapeHtml(k.tag || "—")}</span></div>
+                <div style="font-family: Fredoka, Nunito; font-size:18px; font-weight:600;">${escapeHtml(k.name)}</div>
+                <div class="small">${statusBadge(k.status)} <span style="margin-left:8px;">tag: ${escapeHtml(k.tag || '—')}</span></div>
               </div>
             </div>
             <div class="row">
@@ -614,44 +822,35 @@ export default function KittenGrowthTrackerApp() {
             </div>
           </div>
 
-          <div class="statRow" style="margin-top: 12px;">
-            <div class="stat"><div class="t">Latest weight</div><div class="v">${lastV == null ? "—" : fmt(lastV, digits)} ${state.unit}</div><div class="s">${last?.date || ""}</div></div>
-            <div class="stat"><div class="t">Age at latest</div><div class="v">${ageDays == null ? "—" : ageDays} days</div><div class="s">born ${state.litterBirthDateISO}</div></div>
-            <div class="stat"><div class="t">Change since last</div><div class="v">${delta == null ? "—" : `${delta >= 0 ? "+" : ""}${fmt(delta, digits)} ${state.unit}`}</div><div class="s">${prev ? `${prev.date} → ${last?.date || ""}` : ""}</div></div>
-            <div class="stat"><div class="t">Avg / day</div><div class="v">${deltaPerDay == null ? "—" : fmt(deltaPerDay, state.unit === "g" ? 1 : 3)} ${state.unit}/day</div><div class="s">(last interval)</div></div>
+          <div class="statRow" style="margin-top:12px;">
+            <div class="stat"><div class="t">Latest weight</div><div class="v">${lastV == null ? '—' : fmt(lastV, digits)} ${state.unit}</div><div class="s">${last ? last.date : ''}</div></div>
+            <div class="stat"><div class="t">Age at latest</div><div class="v">${ageDays == null ? '—' : ageDays} days</div><div class="s">born ${state.litterBirthDateISO}</div></div>
+            <div class="stat"><div class="t">Change since last</div><div class="v">${delta == null ? '—' : `${delta >= 0 ? '+' : ''}${fmt(delta, digits)} ${state.unit}`}</div><div class="s">${prev ? `${prev.date} → ${last ? last.date : ''}` : ''}</div></div>
+            <div class="stat"><div class="t">Avg / day</div><div class="v">${deltaPerDay == null ? '—' : fmt(deltaPerDay, state.unit === 'g' ? 1 : 3)} ${state.unit}/day</div><div class="s">(last interval)</div></div>
           </div>
 
-          <div class="two" style="margin-top: 14px;">
+          <div class="two" style="margin-top:14px;">
             <div class="card" style="box-shadow:none; background: rgba(255,255,255,.55);">
               <div class="head" style="border-bottom:none;"><div><h2>Profile</h2><div class="small">Name / emoji / status</div></div></div>
               <div class="body">
                 <div class="two">
-                  <div>
-                    <label>Name</label>
-                    <input id="k_name" value="${escapeHtml(k.name)}" />
-                  </div>
-                  <div>
-                    <label>Emoji</label>
-                    <input id="k_emoji" value="${escapeHtml(k.emoji || "")}" placeholder="🐱" />
-                  </div>
+                  <div><label>Name</label><input id="k_name" value="${escapeHtml(k.name)}" /></div>
+                  <div><label>Emoji</label><input id="k_emoji" value="${escapeHtml(k.emoji || '')}" placeholder="🐱" /></div>
                   <div>
                     <label>Status</label>
                     <select id="k_status">
-                      <option value="Available" ${k.status === "Available" ? "selected" : ""}>Available</option>
-                      <option value="Reserved" ${k.status === "Reserved" ? "selected" : ""}>Reserved</option>
-                      <option value="Adopted" ${k.status === "Adopted" ? "selected" : ""}>Adopted</option>
+                      <option value="Available" ${k.status === 'Available' ? 'selected' : ''}>Available</option>
+                      <option value="Reserved" ${k.status === 'Reserved' ? 'selected' : ''}>Reserved</option>
+                      <option value="Adopted" ${k.status === 'Adopted' ? 'selected' : ''}>Adopted</option>
                     </select>
                   </div>
-                  <div>
-                    <label>Tag</label>
-                    <input id="k_tag" value="${escapeHtml(k.tag || "")}" placeholder="Calico / Tux / Orange…" />
-                  </div>
+                  <div><label>Tag</label><input id="k_tag" value="${escapeHtml(k.tag || '')}" placeholder="Calico / Tux / Orange…" /></div>
                 </div>
-                <div style="margin-top: 10px;">
+                <div style="margin-top:10px;">
                   <label>Description</label>
-                  <textarea id="k_desc" placeholder="White stripe on left leg…">${escapeHtml(k.description || "")}</textarea>
+                  <textarea id="k_desc" placeholder="White stripe on left leg…">${escapeHtml(k.description || '')}</textarea>
                 </div>
-                <div style="margin-top: 10px; display:flex; justify-content:flex-end;">
+                <div style="margin-top:10px; display:flex; justify-content:flex-end;">
                   <button class="btn pink" id="saveProfileBtn">💾 Save profile</button>
                 </div>
               </div>
@@ -660,53 +859,44 @@ export default function KittenGrowthTrackerApp() {
             <div class="card" style="box-shadow:none; background: rgba(255,255,255,.55);">
               <div class="head" style="border-bottom:none;"><div><h2>Adopter</h2><div class="small">Enable by setting status to Reserved or Adopted</div></div></div>
               <div class="body">
-                <div class="hint">Adopter fields are ${adopterEnabled ? "enabled ✅" : "disabled until Reserved/Adopted 💤"}.</div>
-                <div class="two" style="margin-top: 10px;">
-                  <div>
-                    <label>Adopter name</label>
-                    <input id="a_name" value="${escapeHtml(k.adopter.name || "")}" ${adopterEnabled ? "" : "disabled"} />
-                  </div>
-                  <div>
-                    <label>Email</label>
-                    <input id="a_email" value="${escapeHtml(k.adopter.email || "")}" ${adopterEnabled ? "" : "disabled"} />
-                  </div>
-                  <div>
-                    <label>Phone</label>
-                    <input id="a_phone" value="${escapeHtml(k.adopter.phone || "")}" ${adopterEnabled ? "" : "disabled"} />
-                  </div>
+                <div class="hint">Adopter fields are ${adopterEnabled ? 'enabled ✅' : 'disabled until Reserved/Adopted 💤'}.</div>
+                <div class="two" style="margin-top:10px;">
+                  <div><label>Adopter name</label><input id="a_name" value="${escapeHtml(k.adopter.name || '')}" ${adopterEnabled ? '' : 'disabled'} /></div>
+                  <div><label>Email</label><input id="a_email" value="${escapeHtml(k.adopter.email || '')}" ${adopterEnabled ? '' : 'disabled'} /></div>
+                  <div><label>Phone</label><input id="a_phone" value="${escapeHtml(k.adopter.phone || '')}" ${adopterEnabled ? '' : 'disabled'} /></div>
                   <div style="grid-column:1/-1;">
                     <label>Notes</label>
-                    <textarea id="a_notes" ${adopterEnabled ? "" : "disabled"} placeholder="Meetup preferences, home notes, gotcha-day plan…">${escapeHtml(k.adopter.notes || "")}</textarea>
+                    <textarea id="a_notes" ${adopterEnabled ? '' : 'disabled'} placeholder="Meetup preferences, home notes, gotcha-day plan…">${escapeHtml(k.adopter.notes || '')}</textarea>
                   </div>
                 </div>
-                <div style="margin-top: 10px; display:flex; justify-content:flex-end;">
-                  <button class="btn pink" id="saveAdopterBtn" ${adopterEnabled ? "" : "disabled"}>💖 Save adopter</button>
+                <div style="margin-top:10px; display:flex; justify-content:flex-end;">
+                  <button class="btn pink" id="saveAdopterBtn" ${adopterEnabled ? '' : 'disabled'}>💖 Save adopter</button>
                 </div>
               </div>
             </div>
           </div>
 
-          <div class="two" style="margin-top: 14px;">
+          <div class="two" style="margin-top:14px;">
             <div class="card" style="box-shadow:none; background: rgba(255,255,255,.55);">
               <div class="head" style="border-bottom:none;"><div><h2>Weigh-ins</h2><div class="small">Date • age (days) • weight</div></div></div>
               <div class="body">
                 <table>
                   <thead>
-                    <tr><th style="width: 30%">Date</th><th style="width: 18%">Age (days)</th><th>Weight</th><th style="text-align:right; width: 90px;">Action</th></tr>
+                    <tr><th style="width:30%">Date</th><th style="width:18%">Age (days)</th><th>Weight</th><th style="text-align:right; width:90px;">Action</th></tr>
                   </thead>
                   <tbody>
                     ${weighRows || '<tr><td colspan="4" class="kmeta">No weigh-ins yet.</td></tr>'}
                   </tbody>
                 </table>
-                <div class="small" style="margin-top: 8px;">Tip: Use “Add weigh-in” above the charts.</div>
+                <div class="small" style="margin-top:8px;">Tip: Use “Add weigh-in” above the charts.</div>
               </div>
             </div>
 
             <div class="card" style="box-shadow:none; background: rgba(255,255,255,.55);">
               <div class="head" style="border-bottom:none;"><div><h2>Notes</h2><div class="small">Personality, feeding notes, meds, litter training…</div></div></div>
               <div class="body">
-                <textarea id="k_notes" placeholder="Orange is a chaos muffin but purrs like a tractor…">${escapeHtml(k.notes || "")}</textarea>
-                <div style="margin-top: 10px; display:flex; justify-content:flex-end;">
+                <textarea id="k_notes" placeholder="Orange is a chaos muffin but purrs like a tractor…">${escapeHtml(k.notes || '')}</textarea>
+                <div style="margin-top:10px; display:flex; justify-content:flex-end;">
                   <button class="btn pink" id="saveNotesBtn">📝 Save notes</button>
                 </div>
               </div>
@@ -714,171 +904,169 @@ export default function KittenGrowthTrackerApp() {
           </div>
         `;
 
-        // Bind delete weigh-in
-        selectedPanel.querySelectorAll("[data-del]").forEach((btn: any) => {
-          btn.addEventListener("click", () => {
-            const date = btn.getAttribute("data-del");
-            if (confirm(`Delete weigh-in on ${date} for ${k.name}?`)) {
-              k.weighIns = (k.weighIns || []).filter((w: any) => w.date !== date);
+        // Delete weigh-in
+        selectedPanel.querySelectorAll('[data-del]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const date = btn.getAttribute('data-del');
+            if(confirm(`Delete weigh-in on ${date} for ${k.name}?`)){
+              k.weighIns = (k.weighIns || []).filter(w => w.date !== date);
               saveState();
               renderAll();
             }
           });
         });
 
-        document.getElementById("focusOnlyBtn")?.addEventListener("click", () => {
+        document.getElementById('focusOnlyBtn').addEventListener('click', () => {
           allToggle.checked = false;
           rebuildCharts();
         });
-        document.getElementById("showAllBtn")?.addEventListener("click", () => {
+        document.getElementById('showAllBtn').addEventListener('click', () => {
           allToggle.checked = true;
           rebuildCharts();
         });
 
-        document.getElementById("saveProfileBtn")?.addEventListener("click", () => {
-          k.name = (document.getElementById("k_name") as HTMLInputElement).value.trim() || k.name;
-          k.emoji = (document.getElementById("k_emoji") as HTMLInputElement).value.trim() || k.emoji;
-          k.status = (document.getElementById("k_status") as HTMLSelectElement).value;
-          k.tag = (document.getElementById("k_tag") as HTMLInputElement).value.trim();
-          k.description = (document.getElementById("k_desc") as HTMLTextAreaElement).value;
+        document.getElementById('saveProfileBtn').addEventListener('click', (ev) => {
+          ev.preventDefault();
+          k.name = document.getElementById('k_name').value.trim() || k.name;
+          k.emoji = document.getElementById('k_emoji').value.trim() || k.emoji;
+          k.status = document.getElementById('k_status').value;
+          k.tag = document.getElementById('k_tag').value.trim();
+          k.description = document.getElementById('k_desc').value;
           ensureAdopter(k);
           saveState();
           renderAll();
         });
 
-        document.getElementById("saveAdopterBtn")?.addEventListener("click", () => {
+        document.getElementById('saveAdopterBtn').addEventListener('click', (ev) => {
+          ev.preventDefault();
           ensureAdopter(k);
-          k.adopter.name = (document.getElementById("a_name") as HTMLInputElement).value;
-          k.adopter.email = (document.getElementById("a_email") as HTMLInputElement).value;
-          k.adopter.phone = (document.getElementById("a_phone") as HTMLInputElement).value;
-          k.adopter.notes = (document.getElementById("a_notes") as HTMLTextAreaElement).value;
+          k.adopter.name  = document.getElementById('a_name').value;
+          k.adopter.email = document.getElementById('a_email').value;
+          k.adopter.phone = document.getElementById('a_phone').value;
+          k.adopter.notes = document.getElementById('a_notes').value;
           saveState();
           renderAll();
         });
 
-        document.getElementById("saveNotesBtn")?.addEventListener("click", () => {
-          k.notes = (document.getElementById("k_notes") as HTMLTextAreaElement).value;
+        document.getElementById('saveNotesBtn').addEventListener('click', (ev) => {
+          ev.preventDefault();
+          k.notes = document.getElementById('k_notes').value;
           saveState();
           renderAll(false);
         });
       };
 
-      const renderAll = (rebuild = true) => {
+      const renderAll = (rebuild=true) => {
         unitSelect.value = state.unit;
-        bornDateEl!.textContent = state.litterBirthDateISO;
+        bornDateEl.textContent = state.litterBirthDateISO;
         renderRoster();
         renderSelected();
-        if (rebuild) rebuildCharts();
+        if(rebuild) rebuildCharts();
       };
 
-      // ---------------------------
       // Events
-      // ---------------------------
-      unitSelect.addEventListener("change", () => {
+      unitSelect.addEventListener('change', () => {
         state.unit = unitSelect.value;
         saveState();
         renderAll();
       });
-      allToggle.addEventListener("change", () => rebuildCharts());
-      normalizeToggle.addEventListener("change", () => rebuildCharts());
-      searchInput.addEventListener("input", () => renderRoster());
+      allToggle.addEventListener('change', () => rebuildCharts());
+      normalizeToggle.addEventListener('change', () => rebuildCharts());
+      searchInput.addEventListener('input', () => renderRoster());
 
-      exportBtn.addEventListener("click", () => {
-        const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+      exportBtn.addEventListener('click', () => {
+        const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
+        const a = document.createElement('a');
         a.href = url;
-        a.download = `kitten-growth-${new Date().toISOString().slice(0, 10)}.json`;
+        a.download = `kitten-growth-${new Date().toISOString().slice(0,10)}.json`;
         document.body.appendChild(a);
         a.click();
         a.remove();
         URL.revokeObjectURL(url);
       });
 
-      importFile.addEventListener("change", () => {
-        const f = importFile.files?.[0];
-        if (!f) return;
+      importFile.addEventListener('change', () => {
+        const f = importFile.files && importFile.files[0];
+        if(!f) return;
         const reader = new FileReader();
         reader.onload = () => {
-          try {
-            const incoming = JSON.parse(String(reader.result || ""));
-            const merged: any = deepClone(SEED);
-            merged.unit = incoming.unit === "g" ? "g" : "oz";
+          try{
+            const incoming = JSON.parse(String(reader.result || ''));
+            const merged = deepClone(SEED);
+            merged.unit = incoming.unit === 'g' ? 'g' : 'oz';
             merged.litterBirthDateISO = incoming.litterBirthDateISO || merged.litterBirthDateISO;
-            const byId = new Map((incoming.kittens || []).map((k: any) => [k.id, k]));
-            merged.kittens = merged.kittens.map((k: any) => {
+            const byId = new Map((incoming.kittens || []).map(k => [k.id, k]));
+            merged.kittens = merged.kittens.map(k => {
               const inc = byId.get(k.id);
-              if (!inc) return k;
+              if(!inc) return k;
               return {
                 ...k,
                 ...inc,
                 id: k.id,
                 adopter: { ...k.adopter, ...(inc.adopter || {}) },
                 weighIns: sortWeighIns(Array.isArray(inc.weighIns) ? inc.weighIns : k.weighIns),
-                milestones: Array.isArray(inc.milestones) ? inc.milestones : k.milestones || [],
+                milestones: Array.isArray(inc.milestones) ? inc.milestones : (k.milestones || [])
               };
             });
             state = merged;
-            selectedId = state.kittens[0]?.id || selectedId;
+            selectedId = (state.kittens[0] && state.kittens[0].id) ? state.kittens[0].id : selectedId;
             saveState();
             renderAll();
-          } catch (e: any) {
-            alert("Could not import JSON: " + e);
+          }catch(e){
+            alert('Could not import JSON: ' + e);
           }
         };
         reader.readAsText(f);
-        importFile.value = "";
+        importFile.value = '';
       });
 
-      resetBtn.addEventListener("click", () => {
-        if (confirm("Reset back to the original photo data? This overwrites your saved data.")) {
+      resetBtn.addEventListener('click', () => {
+        if(confirm('Reset back to the original photo data? This overwrites your saved data.')){
           state = deepClone(SEED);
-          selectedId = state.kittens[0]?.id || "orange";
+          selectedId = (state.kittens[0] && state.kittens[0].id) ? state.kittens[0].id : 'orange';
           saveState();
           renderAll();
         }
       });
 
-      tabButtons.forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const tab = btn.getAttribute("data-tab") || "growth";
-          tabButtons.forEach((b) => b.classList.toggle("active", b === btn));
-          Object.entries(wraps).forEach(([k, el]) => {
-            if (el) el.style.display = k === tab ? "" : "none";
-          });
+      tabButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const tab = btn.getAttribute('data-tab') || 'growth';
+          tabButtons.forEach(b => b.classList.toggle('active', b === btn));
+          Object.entries(wraps).forEach(([k, el]) => { if(el) el.style.display = (k === tab) ? '' : 'none'; });
         });
       });
 
-      addWeighBtn.addEventListener("click", () => {
-        const k = state.kittens.find((x: any) => x.id === selectedId);
-        if (!k) return;
+      addWeighBtn.addEventListener('click', () => {
+        const k = state.kittens.find(x => x.id === selectedId);
+        if(!k) return;
         weighUnit.textContent = state.unit;
-        weighValue.value = "";
-
+        weighValue.value = '';
         const s = sortWeighIns(k.weighIns || []);
         let d = new Date();
-        if (s.length) {
-          const last = new Date(s[s.length - 1].date + "T00:00:00");
+        if(s.length){
+          const last = new Date(s[s.length - 1].date + 'T00:00:00');
           last.setDate(last.getDate() + 1);
           d = last;
         }
-        weighDate.value = d.toISOString().slice(0, 10);
+        weighDate.value = d.toISOString().slice(0,10);
         weighDialog.showModal();
       });
 
-      document.getElementById("weighSave")?.addEventListener("click", (ev) => {
+      document.getElementById('weighSave').addEventListener('click', (ev) => {
         ev.preventDefault();
-        const k = state.kittens.find((x: any) => x.id === selectedId);
-        if (!k) return;
+        const k = state.kittens.find(x => x.id === selectedId);
+        if(!k) return;
         const date = weighDate.value;
         const num = Number(String(weighValue.value).trim());
-        if (!date || !Number.isFinite(num)) {
-          alert("Please enter a valid date and number.");
+        if(!date || !Number.isFinite(num)){
+          alert('Please enter a valid date and number.');
           return;
         }
-        const oz = state.unit === "g" ? gToOz(num) : num;
-        const existing = (k.weighIns || []).find((w: any) => w.date === date);
-        if (existing) existing.oz = oz;
+        const oz = (state.unit === 'g') ? gToOz(num) : num;
+        const existing = (k.weighIns || []).find(w => w.date === date);
+        if(existing) existing.oz = oz;
         else (k.weighIns || []).push({ date, oz });
         k.weighIns = sortWeighIns(k.weighIns || []);
         saveState();
@@ -886,413 +1074,40 @@ export default function KittenGrowthTrackerApp() {
         renderAll();
       });
 
+      // Live age ticker
       const tickAge = () => {
         const a = formatAge(msSinceISOStart(state.litterBirthDateISO));
-        ageTickerEl!.textContent = `${a.days}d ${String(a.hrs).padStart(2, "0")}h ${String(a.mins).padStart(2, "0")}m ${String(a.secs).padStart(2, "0")}s`;
+        ageTickerEl.textContent = `${a.days}d ${String(a.hrs).padStart(2,'0')}h ${String(a.mins).padStart(2,'0')}m ${String(a.secs).padStart(2,'0')}s`;
       };
       tickAge();
-      window.setInterval(tickAge, 1000);
+      setInterval(tickAge, 1000);
 
-      // ---------------------------
-      // Lightweight self-tests (runs once; logs to console)
-      // ---------------------------
-      const tests: Array<{ name: string; run: () => void }> = [];
-      const assert = (cond: any, msg: string) => {
-        if (!cond) throw new Error(msg);
-      };
-
-      tests.push({
-        name: "Seed has 6 kittens",
-        run: () => assert(SEED.kittens.length === 6, "Expected 6 kittens in seed data"),
-      });
-      tests.push({
-        name: "oz↔g conversions are roughly inverse",
-        run: () => {
+      // Self-tests
+      (function runTests(){
+        const tests = [];
+        const assert = (cond, msg) => { if(!cond) throw new Error(msg); };
+        tests.push(() => assert(SEED.kittens.length === 6, 'Expected 6 kittens in seed data'));
+        tests.push(() => {
           const oz = 10;
           const g = ozToG(oz);
           const oz2 = gToOz(g);
-          assert(Math.abs(oz2 - oz) < 1e-9, "Expected gToOz(ozToG(x))≈x");
-        },
-      });
-      tests.push({
-        name: "dayDiffISO basic sanity",
-        run: () => {
-          assert(dayDiffISO("2026-01-01", "2026-01-05") === 4, "Expected 4 day difference");
-        },
-      });
-
-      try {
-        tests.forEach((t) => t.run());
-        // eslint-disable-next-line no-console
-        console.info(`Kitten tracker self-tests: ${tests.length} passed ✅`);
-      } catch (e) {
-        // eslint-disable-next-line no-console
-        console.error("Kitten tracker self-tests failed ❌", e);
-      }
+          assert(Math.abs(oz2 - oz) < 1e-9, 'Expected gToOz(ozToG(x))≈x');
+        });
+        tests.push(() => assert(dayDiffISO('2026-01-01','2026-01-05') === 4, 'Expected 4 day difference'));
+        try{
+          tests.forEach(t => t());
+          console.info(`Kitten tracker self-tests: ${tests.length} passed ✅`);
+        }catch(e){
+          console.error('Kitten tracker self-tests failed ❌', e);
+        }
+      })();
 
       // Initial render
-      bornDateEl!.textContent = state.litterBirthDateISO;
+      bornDateEl.textContent = state.litterBirthDateISO;
       unitSelect.value = state.unit;
       renderAll();
-    };
 
-    init().catch((e) => {
-      // eslint-disable-next-line no-console
-      console.error(e);
-      alert(String(e));
-    });
-  }, []);
-
-  return (
-    <div>
-      {/* Fonts */}
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-      <link
-        href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&family=Nunito:wght@400;600;700&display=swap"
-        rel="stylesheet"
-      />
-
-      <style>{`
-        :root{
-          --bg: #fff7fb;
-          --card: rgba(255,255,255,.75);
-          --card-strong: rgba(255,255,255,.9);
-          --ink: #1f2430;
-          --muted: rgba(31,36,48,.65);
-          --border: rgba(31,36,48,.12);
-          --shadow: 0 10px 30px rgba(31,36,48,.08);
-          --pink: #ffb7d1;
-          --mint: #baf7e6;
-          --lav: #d8c7ff;
-          --chip: rgba(255,255,255,.65);
-          --ok: #2d7a45;
-          --warn: #b15c00;
-          --bad: #a12121;
-          --radius: 22px;
-        }
-        *{ box-sizing: border-box; }
-        body{ margin:0; }
-        .kgt-body{
-          margin:0;
-          font-family: Nunito, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-          color: var(--ink);
-          background:
-            radial-gradient(600px 600px at 10% 10%, var(--mint), transparent 60%),
-            radial-gradient(700px 700px at 90% 20%, var(--lav), transparent 60%),
-            radial-gradient(700px 700px at 40% 110%, var(--pink), transparent 60%),
-            linear-gradient(180deg, var(--bg), #ffffff);
-          min-height: 100vh;
-          padding: 22px 16px 40px;
-        }
-        .container{ max-width: 1100px; margin: 0 auto; }
-        .shell{
-          position: relative;
-          border: 1px solid var(--border);
-          border-radius: 32px;
-          background: rgba(255,255,255,.6);
-          box-shadow: var(--shadow);
-          overflow: hidden;
-        }
-        .shell:before{
-          content:"";
-          position:absolute; inset:0;
-          background-image:
-            radial-gradient(circle at 20px 18px, rgba(31,36,48,.10) 0 6px, transparent 7px),
-            radial-gradient(circle at 44px 18px, rgba(31,36,48,.10) 0 6px, transparent 7px),
-            radial-gradient(circle at 32px 40px, rgba(31,36,48,.10) 0 7px, transparent 8px),
-            radial-gradient(circle at 32px 58px, rgba(31,36,48,.10) 0 10px, transparent 11px);
-          background-size: 140px 140px;
-          background-position: 10px 10px;
-          opacity: .06;
-          pointer-events:none;
-        }
-        header{
-          position: relative;
-          padding: 18px 18px 10px;
-          display:flex;
-          gap: 12px;
-          align-items:flex-start;
-          justify-content: space-between;
-          flex-wrap: wrap;
-        }
-        h1{
-          margin:0;
-          font-family: Fredoka, Nunito, system-ui;
-          font-weight: 600;
-          letter-spacing: .2px;
-          font-size: 26px;
-          display:flex;
-          align-items:center;
-          gap: 10px;
-        }
-        .sub{ margin-top:6px; color: var(--muted); font-size: 13px; }
-        .row{ display:flex; gap:10px; flex-wrap: wrap; align-items:center; }
-        .pill{
-          display:inline-flex;
-          align-items:center;
-          gap:8px;
-          padding: 8px 12px;
-          background: var(--chip);
-          border: 1px solid var(--border);
-          border-radius: 999px;
-          font-size: 12px;
-          color: rgba(31,36,48,.8);
-          backdrop-filter: blur(8px);
-        }
-        .btn{
-          appearance:none;
-          border: 1px solid var(--border);
-          background: rgba(255,255,255,.9);
-          border-radius: 999px;
-          padding: 9px 12px;
-          font-weight: 700;
-          font-size: 13px;
-          cursor:pointer;
-          transition: transform .06s ease, box-shadow .2s ease;
-          box-shadow: 0 6px 18px rgba(31,36,48,.06);
-        }
-        .btn:hover{ transform: translateY(-1px); }
-        .btn:active{ transform: translateY(0px); }
-        .btn.primary{
-          border-color: rgba(31,36,48,.16);
-          background: linear-gradient(180deg, #ffffff, rgba(255,255,255,.8));
-        }
-        .btn.pink{
-          background: linear-gradient(180deg, var(--pink), rgba(255,255,255,.85));
-          border-color: rgba(255,183,209,.7);
-        }
-        .grid{
-          position: relative;
-          padding: 0 18px 18px;
-          display:grid;
-          gap: 14px;
-          grid-template-columns: 1.4fr .9fr;
-        }
-        @media (max-width: 980px){ .grid{ grid-template-columns: 1fr; } }
-        .card{
-          border: 1px solid var(--border);
-          border-radius: var(--radius);
-          background: rgba(255,255,255,.75);
-          backdrop-filter: blur(10px);
-          box-shadow: 0 10px 24px rgba(31,36,48,.05);
-          overflow:hidden;
-        }
-        .card .head{
-          padding: 14px 14px 10px;
-          display:flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          gap: 12px;
-          border-bottom: 1px solid rgba(31,36,48,.06);
-          background: linear-gradient(180deg, rgba(255,255,255,.7), rgba(255,255,255,.3));
-        }
-        .card h2{ margin:0; font-size: 15px; font-family: Fredoka, Nunito, system-ui; font-weight: 600; }
-        .small{ color: var(--muted); font-size: 12px; margin-top: 4px; }
-        .card .body{ padding: 14px; }
-        .kittens{ display:grid; grid-template-columns: 1fr; gap: 10px; }
-        .krow{
-          display:flex; justify-content: space-between; gap: 10px;
-          padding: 10px 10px; border: 1px solid rgba(31,36,48,.10);
-          border-radius: 18px; background: rgba(255,255,255,.65);
-          cursor: pointer; transition: transform .06s ease, background .2s ease;
-        }
-        .krow:hover{ transform: translateY(-1px); background: rgba(255,255,255,.8); }
-        .krow.active{ outline: 2px solid rgba(31,36,48,.16); }
-        .kname{ display:flex; align-items:center; gap: 10px; }
-        .emoji{ font-size: 20px; }
-        .kmeta{ font-size: 12px; color: var(--muted); }
-        .badge{ font-size: 11px; font-weight: 800; padding: 5px 8px; border-radius: 999px; border: 1px solid var(--border); background: rgba(255,255,255,.8); }
-        .badge.avail{ color: var(--ok); }
-        .badge.resv{ color: #b15c00; }
-        .badge.adpt{ color: var(--bad); }
-        .controls{ display:flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-        label{ font-size: 12px; color: rgba(31,36,48,.85); font-weight: 800; }
-        input, select, textarea{ width: 100%; border: 1px solid rgba(31,36,48,.14); border-radius: 16px; padding: 10px 12px; background: rgba(255,255,255,.75); outline: none; font-size: 13px; }
-        textarea{ resize: vertical; min-height: 88px; }
-        .two{ display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        @media (max-width: 720px){ .two{ grid-template-columns: 1fr; } }
-        .tabs{ display:flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
-        .tabbar{ display:flex; gap: 6px; flex-wrap: wrap; border: 1px solid rgba(31,36,48,.10); border-radius: 999px; padding: 6px; background: rgba(255,255,255,.6); }
-        .tabbtn{ border: none; background: transparent; padding: 8px 10px; border-radius: 999px; font-weight: 900; font-size: 12px; cursor:pointer; color: rgba(31,36,48,.7); }
-        .tabbtn.active{ background: rgba(31,36,48,.08); color: rgba(31,36,48,.95); }
-        .charts{ display:grid; grid-template-columns: 1fr; gap: 12px; }
-        .chartWrap{ height: 320px; }
-        .chartWrap.short{ height: 260px; }
-        .hint{ font-size: 12px; color: var(--muted); background: rgba(255,255,255,.6); border: 1px dashed rgba(31,36,48,.16); border-radius: 18px; padding: 10px 12px; }
-        table{ width: 100%; border-collapse: collapse; overflow:hidden; border-radius: 18px; border: 1px solid rgba(31,36,48,.10); background: rgba(255,255,255,.6); }
-        th, td{ padding: 10px 10px; text-align:left; font-size: 13px; }
-        th{ font-size: 12px; color: var(--muted); font-weight: 900; background: rgba(31,36,48,.03); }
-        tr+tr td{ border-top: 1px solid rgba(31,36,48,.06); }
-        .footer{ padding: 14px 18px 18px; color: var(--muted); font-size: 12px; }
-        .kheader{ display:flex; align-items:center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-        .bigEmoji{ font-size: 30px; }
-        .statRow{ display:grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-        @media (max-width: 900px){ .statRow{ grid-template-columns: repeat(2, 1fr); } }
-        .stat{ border: 1px solid rgba(31,36,48,.10); border-radius: 18px; background: rgba(255,255,255,.7); padding: 10px 12px; }
-        .stat .t{ font-size: 11px; color: var(--muted); font-weight: 900; }
-        .stat .v{ margin-top: 4px; font-size: 18px; font-family: Fredoka, Nunito, system-ui; }
-        .stat .s{ margin-top: 2px; font-size: 11px; color: var(--muted); }
-        .miniActions{ display:flex; gap: 8px; flex-wrap: wrap; }
-        .fileInput{ display:none; }
-      `}</style>
-
-      <div className="kgt-body">
-        <div className="container">
-          <div className="shell">
-            <header>
-              <div>
-                <h1>
-                  Kitten Growth Tracker <span aria-hidden>🐾</span>
-                </h1>
-                <div className="sub">GitHub Pages-friendly • saved in your browser • multiple charts • adopter tracking • live age ticker</div>
-              </div>
-
-              <div className="row">
-                <span className="pill" title="Litter age updates every second">
-                  <span aria-hidden>⏱️</span> Litter age: <span id="ageTicker" style={{ fontWeight: 900 }}>—</span>
-                </span>
-                <span className="pill" title="Born date">
-                  <span aria-hidden>🎂</span> Born: <span id="bornDate">—</span>
-                </span>
-                <button className="btn" id="exportBtn" title="Download your data as JSON">⬇️ Export</button>
-                <label className="btn" title="Import a previously exported JSON">
-                  ⬆️ Import
-                  <input className="fileInput" id="importFile" type="file" accept="application/json" />
-                </label>
-                <button className="btn pink" id="resetBtn" title="Reset back to the original photo data">🧼 Reset</button>
-              </div>
-            </header>
-
-            <div className="grid">
-              <div className="card">
-                <div className="head">
-                  <div>
-                    <h2>Charts (pick a tab!)</h2>
-                    <div className="small">Hover for details • toggle “All kittens” vs selected • swap units anytime</div>
-                  </div>
-                  <div className="controls">
-                    <label style={{ width: 140 }}>
-                      Units
-                      <select id="unitSelect">
-                        <option value="oz">Ounces (oz)</option>
-                        <option value="g">Grams (g)</option>
-                      </select>
-                    </label>
-                    <label style={{ display: "flex", alignItems: "center", gap: 8, width: "auto", fontWeight: 900 as any }}>
-                      <input id="allToggle" type="checkbox" defaultChecked /> All kittens
-                    </label>
-                    <label style={{ display: "flex", alignItems: "center", gap: 8, width: "auto", fontWeight: 900 as any }}>
-                      <input id="normalizeToggle" type="checkbox" /> Normalize
-                    </label>
-                  </div>
-                </div>
-
-                <div className="body">
-                  <div className="tabs">
-                    <div className="tabbar" role="tablist" aria-label="Chart tabs">
-                      <button className="tabbtn active" data-tab="growth" role="tab">📈 Growth</button>
-                      <button className="tabbtn" data-tab="gain" role="tab">⚡ Daily gain</button>
-                      <button className="tabbtn" data-tab="avg" role="tab">✨ Litter avg</button>
-                      <button className="tabbtn" data-tab="latest" role="tab">🏆 Latest weights</button>
-                    </div>
-                    <div className="miniActions">
-                      <button className="btn primary" id="addWeighBtn" title="Add a weigh-in for the selected kitten">➕ Add weigh-in</button>
-                    </div>
-                  </div>
-
-                  <div className="charts">
-                    <div className="hint" id="chartHint">Tip: Turn on Normalize to compare growth curves (change since first weigh-in).</div>
-
-                    <div className="chartWrap" id="wrap-growth"><canvas id="chartGrowth" /></div>
-                    <div className="chartWrap" id="wrap-gain" style={{ display: "none" }}><canvas id="chartGain" /></div>
-                    <div className="chartWrap short" id="wrap-avg" style={{ display: "none" }}><canvas id="chartAvg" /></div>
-                    <div className="chartWrap short" id="wrap-latest" style={{ display: "none" }}><canvas id="chartLatest" /></div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="card">
-                <div className="head">
-                  <div>
-                    <h2>Roster</h2>
-                    <div className="small">6 kittens • tap one to edit adopter + weigh-ins</div>
-                  </div>
-                  <label style={{ width: 190 }}>
-                    Search
-                    <input id="searchInput" type="text" placeholder="name, tag, adopter…" />
-                  </label>
-                </div>
-                <div className="body">
-                  <div className="kittens" id="kittensList" />
-                </div>
-              </div>
-
-              <div className="card" style={{ gridColumn: "1 / -1" }}>
-                <div className="head">
-                  <div className="kheader">
-                    <div>
-                      <h2>Selected kitten</h2>
-                      <div className="small" id="selectedSub">—</div>
-                    </div>
-                    <div className="row">
-                      <span className="pill" title="This is the currently selected kitten">
-                        <span aria-hidden>🐾</span> <span id="selectedNamePill">—</span>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="body" id="selectedPanel">{/* Filled by JS */}</div>
-              </div>
-            </div>
-
-            <div className="footer">Made for cozy kitten season. Export your JSON occasionally so you can hand adopters a sweet history. 💖</div>
-          </div>
-        </div>
-      </div>
-
-      <dialog
-        id="weighDialog"
-        style={{
-          border: "none",
-          borderRadius: 22,
-          padding: 0,
-          width: "min(520px, 92vw)",
-          boxShadow: "0 10px 30px rgba(31,36,48,.08)",
-        }}
-      >
-        <form
-          method="dialog"
-          style={{
-            padding: 14,
-            background: "rgba(255,255,255,.96)",
-            border: "1px solid rgba(31,36,48,.14)",
-            borderRadius: 22,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-            <div style={{ fontFamily: "Fredoka, Nunito", fontSize: 16, fontWeight: 600 }}>Add weigh-in</div>
-            <button className="btn" value="cancel" aria-label="Close">✖</button>
-          </div>
-          <div style={{ marginTop: 10 }} className="two">
-            <div>
-              <label>Date</label>
-              <input type="date" id="weighDate" />
-            </div>
-            <div>
-              <label>
-                Weight (<span id="weighUnit">oz</span>)
-              </label>
-              <input type="text" inputMode="decimal" id="weighValue" placeholder="e.g., 7.13" />
-            </div>
-          </div>
-          <div className="hint" style={{ marginTop: 10 }}>If you already weighed on that date, this will update it.</div>
-          <div style={{ marginTop: 10, display: "flex", gap: 10, justifyContent: "flex-end" }}>
-            <button className="btn" value="cancel">Cancel</button>
-            <button className="btn pink" id="weighSave" value="default">Save</button>
-          </div>
-        </form>
-      </dialog>
-    </div>
-  );
-}
+    })();
+  </script>
+</body>
+</html>
