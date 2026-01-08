@@ -1227,9 +1227,17 @@
         const digits = digitsForUnit();
         const deltaText = delta == null ? "" : `${delta >= 0 ? "+" : ""}${fmt(delta, digits)} ${state.unit}`;
 
-        const hasPerson = (k.adopter?.name || "").trim().length > 0 && (k.status === "Reserved" || k.status === "Adopted");
-        const whoLabel = k.status === "Adopted" ? "adopted by" : "reserved by";
-        const whoText = hasPerson ? ` • ${whoLabel}: ${escapeHtml(k.adopter.name)}` : "";
+        const hasPerson =
+  (k.adopter?.name || "").trim().length > 0 &&
+  (k.status === "Reserved" || k.status === "Adopted");
+
+const whoLabel = k.status === "Adopted" ? "adopted by" : "reserved by";
+
+// puts it on its own line under the description/tag
+const whoLine = hasPerson
+  ? `<div class="kmeta" style="margin-top:2px;">${escapeHtml(whoLabel)}: ${escapeHtml(k.adopter.name)}</div>`
+  : "";
+
 
         return `
           <div class="krow ${k.id === selectedId ? "active" : ""}" data-id="${k.id}">
@@ -1238,10 +1246,11 @@
                 <div class="emoji">${escapeHtml(k.emoji || "🐾")}</div>
                 <div>
                   <div style="font-weight: 900;">${escapeHtml(k.name)}</div>
-                  <div class="kmeta">
-                    ${escapeHtml(k.description ? k.description : (k.tag || ""))}
-                    ${whoText}
-                  </div>
+                 <div class="kmeta">
+  <div>${escapeHtml(k.description ? k.description : (k.tag || ""))}</div>
+  ${whoLine}
+</div>
+
                 </div>
               </div>
             </div>
