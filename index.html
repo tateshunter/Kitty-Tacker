@@ -314,7 +314,7 @@
     }
     .imgNavBtn:disabled{ opacity:.5; cursor:not-allowed; }
 
-    /* ✅ Weigh-in list (no tables) */
+    /* Weigh-in list (no tables) */
     .weighList{
       display:flex;
       flex-direction: column;
@@ -344,6 +344,9 @@
     }
     .weighItem .lbl{ font-size: 11px; color: var(--muted); font-weight: 900; }
     .weighItem .val{ margin-top: 2px; font-size: 13px; font-weight: 800; }
+
+    /* Note actions */
+    .noteActions{ display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; margin-top:8px; }
   </style>
 </head>
 
@@ -1122,6 +1125,44 @@
     };
 
     /***********************
+     * NOTES (EDIT/DELETE)
+     ***********************/
+    const renderEntries = (entries, opts={}) => {
+      const {
+        allowActions = false,
+        scope = "k",        // "k" kitten notes, "a" adopter notes
+      } = opts;
+
+      const items = sortEntries(Array.isArray(entries) ? entries : []);
+      if (!items.length) return `<div class="small">No saved notes yet.</div>`;
+
+      return items.map(e => {
+        const when = new Date(e.createdAt);
+        const label = isNaN(when.getTime()) ? escapeHtml(e.createdAt) : when.toLocaleString();
+        const key = escapeHtml(e.createdAt || "");
+        return `
+          <div style="border:1px solid rgba(31,36,48,.10);border-radius:16px;background:rgba(255,255,255,.65);padding:10px 12px;margin-top:8px;">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
+              <div class="small" style="margin:0;font-weight:900;">${escapeHtml(label)}</div>
+              ${allowActions ? `
+                <div class="noteActions" style="margin-top:0;">
+                  <button class="btn" data-note-edit="${key}" data-note-scope="${scope}" title="Edit note">✏️ Edit</button>
+                  <button class="btn" data-note-del="${key}" data-note-scope="${scope}" title="Delete note">🗑️ Delete</button>
+                </div>
+              ` : ""}
+            </div>
+            <div style="margin-top:6px;white-space:pre-wrap;">${escapeHtml(e.text || "")}</div>
+          </div>
+        `;
+      }).join("");
+    };
+
+    const findEntryIndexByCreatedAt = (arr, createdAt) => {
+      if (!Array.isArray(arr)) return -1;
+      return arr.findIndex(x => String(x?.createdAt || "") === String(createdAt || ""));
+    };
+
+    /***********************
      * RENDERING
      ***********************/
     const renderRoster = () => {
@@ -1214,21 +1255,6 @@
       }
     };
 
-    const renderEntries = (entries) => {
-      const items = sortEntries(Array.isArray(entries) ? entries : []);
-      if (!items.length) return `<div class="small">No saved notes yet.</div>`;
-      return items.map(e => {
-        const when = new Date(e.createdAt);
-        const label = isNaN(when.getTime()) ? escapeHtml(e.createdAt) : when.toLocaleString();
-        return `
-          <div style="border:1px solid rgba(31,36,48,.10);border-radius:16px;background:rgba(255,255,255,.65);padding:10px 12px;margin-top:8px;">
-            <div class="small" style="margin:0;font-weight:900;">${escapeHtml(label)}</div>
-            <div style="margin-top:6px;white-space:pre-wrap;">${escapeHtml(e.text || "")}</div>
-          </div>
-        `;
-      }).join("");
-    };
-
     const renderSelected = () => {
       const k = state.kittens.find(x => x.id === selectedId) || state.kittens[0];
       ensureKittenShape(k);
@@ -1269,7 +1295,7 @@
               <div class="val">${fmt(v, digits)} ${state.unit}</div>
             </div>
             <div class="action" style="text-align:right;">
-              <button class="btn" data-del="${escapeHtml(w.date)}" title="Delete weigh-in" ${canEdit() ? "" : "disabled"}>🗑️</button>
+              <button class="btn" data-del-weigh="${escapeHtml(w.date)}" title="Delete weigh-in" ${canEdit() ? "" : "disabled"}>🗑️</button>
             </div>
           </div>
         `;
@@ -1367,7 +1393,9 @@
 
               <div style="margin-top: 12px;">
                 <label>Saved adopter notes</label>
-                <div id="a_notes_list">${renderEntries(k.adopter.notesEntries)}</div>
+                <div id="a_notes_list">
+                  ${renderEntries(k.adopter.notesEntries, { allowActions: (editing && adopterEnabled), scope: "a" })}
+                </div>
               </div>
             </div>
           </div>
@@ -1395,7 +1423,9 @@
 
               <div style="margin-top: 12px;">
                 <label>Saved notes</label>
-                <div id="k_notes_list">${renderEntries(k.notesEntries)}</div>
+                <div id="k_notes_list">
+                  ${renderEntries(k.notesEntries, { allowActions: editing, scope: "k" })}
+                </div>
               </div>
             </div>
           </div>
@@ -1425,10 +1455,11 @@
         rebuildCharts();
       });
 
-      selectedPanel.querySelectorAll("[data-del]").forEach(btn => {
+      // delete weigh-ins
+      selectedPanel.querySelectorAll("[data-del-weigh]").forEach(btn => {
         btn.addEventListener("click", () => {
           if (!canEdit()) return;
-          const date = btn.getAttribute("data-del");
+          const date = btn.getAttribute("data-del-weigh");
           if (confirm(`Delete weigh-in on ${date} for ${k.name}?`)) {
             k.weighIns = (k.weighIns || []).filter(w => w.date !== date);
             k.weighIns = sortWeighIns(k.weighIns || []);
@@ -1465,6 +1496,7 @@
         const t = (document.getElementById("a_note_new").value || "").trim();
         if (!t) return;
 
+        // createdAt is the note ID
         k.adopter.notesEntries.unshift({ createdAt: nowISO(), text: t });
         document.getElementById("a_note_new").value = "";
 
@@ -1486,6 +1518,52 @@
         renderAll(false);
       });
 
+      // ✅ Edit/Delete notes (kitten + adopter)
+      selectedPanel.querySelectorAll("[data-note-edit]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          if (!canEdit()) return;
+          const createdAt = btn.getAttribute("data-note-edit");
+          const scope = btn.getAttribute("data-note-scope") || "k";
+
+          if (scope === "a" && !(k.status === "Reserved" || k.status === "Adopted")) return;
+
+          const list = (scope === "a") ? (k.adopter?.notesEntries || []) : (k.notesEntries || []);
+          const idx = findEntryIndexByCreatedAt(list, createdAt);
+          if (idx < 0) return;
+
+          const current = String(list[idx].text || "");
+          const next = prompt("Edit note:", current);
+          if (next === null) return;
+
+          list[idx].text = String(next);
+          saveLocal();
+          markDirtyAndScheduleSave();
+          renderAll(false);
+        });
+      });
+
+      selectedPanel.querySelectorAll("[data-note-del]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          if (!canEdit()) return;
+          const createdAt = btn.getAttribute("data-note-del");
+          const scope = btn.getAttribute("data-note-scope") || "k";
+
+          if (scope === "a" && !(k.status === "Reserved" || k.status === "Adopted")) return;
+
+          const list = (scope === "a") ? (k.adopter?.notesEntries || []) : (k.notesEntries || []);
+          const idx = findEntryIndexByCreatedAt(list, createdAt);
+          if (idx < 0) return;
+
+          if (!confirm("Delete this note?")) return;
+
+          list.splice(idx, 1);
+          saveLocal();
+          markDirtyAndScheduleSave();
+          renderAll(false);
+        });
+      });
+
+      // Photos
       const kFile = document.getElementById("k_photoFile");
       const kUpload = document.getElementById("k_uploadPhotoBtn");
       const kGallery = document.getElementById("k_gallery");
@@ -1601,7 +1679,7 @@
       }
     });
 
-    // ✅ Date defaults to TODAY every time you open the dialog
+    // Date defaults to TODAY every time
     addWeighBtn.addEventListener("click", () => {
       if (!canEdit()) { alert("Admin unlock required."); return; }
       weighUnit.textContent = state.unit;
