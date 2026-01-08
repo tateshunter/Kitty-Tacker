@@ -348,38 +348,8 @@
     /* Note actions */
     .noteActions{ display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; margin-top:8px; }
 
-    /* ----------------------------
-       ✅ COLLAPSIBLE "Selected kitten"
-       ---------------------------- */
-    details#selectedDetails summary{
-      list-style:none;
-      cursor:pointer;
-    }
-    details#selectedDetails summary::-webkit-details-marker{ display:none; }
-    .detailsChevron{
-      width: 26px;
-      height: 26px;
-      border-radius: 999px;
-      border: 1px solid rgba(31,36,48,.14);
-      background: rgba(255,255,255,.9);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-weight: 900;
-      font-size: 12px;
-      transition: transform .18s ease;
-      user-select:none;
-    }
-    details#selectedDetails[open] .detailsChevron{
-      transform: rotate(180deg);
-    }
-    .summaryRow{
-      display:flex;
-      align-items:center;
-      justify-content: space-between;
-      gap: 12px;
-      width:100%;
-    }
+    /* Collapsible selected detail body */
+    .collapseBody[hidden]{ display:none !important; }
   </style>
 </head>
 
@@ -473,29 +443,42 @@
           </div>
         </div>
 
-        <!-- ✅ COLLAPSIBLE SELECTED KITTEN CARD -->
+        <!-- Selected kitten DETAILS (collapsible) -->
         <div class="card" style="grid-column: 1 / -1;">
-          <details id="selectedDetails" open>
-            <summary>
-              <div class="head">
-                <div class="summaryRow">
-                  <div class="kheader">
-                    <div>
-                      <h2>Selected kitten</h2>
-                      <div class="small" id="selectedSub">—</div>
-                    </div>
-                    <div class="row" style="align-items:center;">
-                      <span class="pill" title="Currently selected kitten">🐾 <span id="selectedNamePill">—</span></span>
-                      <span class="detailsChevron" aria-hidden>▾</span>
-                    </div>
-                  </div>
-                </div>
+          <div class="head">
+            <div class="kheader">
+              <div>
+                <h2>Selected kitten</h2>
+                <div class="small" id="selectedSub">—</div>
               </div>
-            </summary>
-            <div class="body" id="selectedPanel"></div>
-          </details>
+              <div class="row">
+                <span class="pill" title="Currently selected kitten">🐾 <span id="selectedNamePill">—</span></span>
+                <button class="btn primary" id="toggleSelectedBtn" title="Collapse/expand details">▾ Hide details</button>
+              </div>
+            </div>
+          </div>
+          <div class="body collapseBody" id="selectedPanel"></div>
         </div>
 
+        <!-- Selected kitten PHOTOS (always visible, its own container) -->
+        <div class="card" style="grid-column: 1 / -1;">
+          <div class="head">
+            <div>
+              <h2>Selected kitten photos</h2>
+              <div class="small" id="selPhotoSub">—</div>
+            </div>
+            <div class="row" style="justify-content:flex-end;">
+              <input id="sel_photoFile" type="file" accept="image/*" style="max-width:260px;" />
+              <button class="btn pink" id="sel_uploadPhotoBtn">📸 Add photo</button>
+            </div>
+          </div>
+          <div class="body">
+            <div id="sel_gallery" class="gallery"></div>
+            <div class="small" style="margin-top:8px;">(Admin unlock required to add or delete.)</div>
+          </div>
+        </div>
+
+        <!-- Litter & Mom (its own container) -->
         <div class="card" style="grid-column: 1 / -1;">
           <div class="head">
             <div>
@@ -576,6 +559,8 @@
 
     const ADMIN_CODE = "McRae";
     const ADMIN_KEY = "kitten-growth-tracker:admin:v1";
+
+    const SELECTED_COLLAPSE_KEY = "kitten-growth-tracker:selectedCollapsed:v1";
 
     /***********************
      * SEED DATA
@@ -761,8 +746,6 @@
     // Drive helpers
     const driveThumbUrl = (fileId, width = 400) =>
       `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w${width}`;
-    const driveViewUrl = (fileId) =>
-      `https://drive.google.com/uc?id=${encodeURIComponent(fileId)}`;
 
     /***********************
      * ADMIN
@@ -921,6 +904,14 @@
     const selectedNamePill = document.getElementById("selectedNamePill");
     const addWeighBtn = document.getElementById("addWeighBtn");
 
+    const toggleSelectedBtn = document.getElementById("toggleSelectedBtn");
+
+    // Selected kitten photos (always visible)
+    const selPhotoSub = document.getElementById("selPhotoSub");
+    const selPhotoFile = document.getElementById("sel_photoFile");
+    const selUploadBtn = document.getElementById("sel_uploadPhotoBtn");
+    const selGallery = document.getElementById("sel_gallery");
+
     const weighDialog = document.getElementById("weighDialog");
     const weighDate = document.getElementById("weighDate");
     const weighValue = document.getElementById("weighValue");
@@ -950,13 +941,31 @@
     imgDialogClose.addEventListener("click", () => imgDialog.close());
 
     /***********************
+     * COLLAPSE STATE
+     ***********************/
+    const getSelectedCollapsed = () => localStorage.getItem(SELECTED_COLLAPSE_KEY) === "1";
+    const setSelectedCollapsed = (v) => localStorage.setItem(SELECTED_COLLAPSE_KEY, v ? "1" : "0");
+
+    const applySelectedCollapseUI = () => {
+      const collapsed = getSelectedCollapsed();
+      selectedPanel.hidden = collapsed;
+      toggleSelectedBtn.textContent = collapsed ? "▸ Show details" : "▾ Hide details";
+    };
+
+    toggleSelectedBtn.addEventListener("click", () => {
+      setSelectedCollapsed(!getSelectedCollapsed());
+      applySelectedCollapseUI();
+    });
+
+    /***********************
      * IMAGE DIALOG CYCLING
      ***********************/
     let imgContext = { items: [], idx: 0, title: "Photo" };
 
-    // ✅ FIX: Upscale the thumbnail (do NOT pull original)
+    // IMPORTANT: per your request, the dialog uses an UPSCALED THUMBNAIL
+    // (Drive thumbnails at larger width), not the original image.
     const getDialogSrc = (p) => {
-      if (p?.fileId) return driveThumbUrl(p.fileId, 1600); // upscale thumb for dialog
+      if (p?.fileId) return driveThumbUrl(p.fileId, 1600); // upscale thumbnail
       return p?.url || "";
     };
 
@@ -1170,10 +1179,7 @@
      * NOTES (EDIT/DELETE)
      ***********************/
     const renderEntries = (entries, opts={}) => {
-      const {
-        allowActions = false,
-        scope = "k",        // "k" kitten notes, "a" adopter notes
-      } = opts;
+      const { allowActions = false, scope = "k" } = opts;
 
       const items = sortEntries(Array.isArray(entries) ? entries : []);
       if (!items.length) return `<div class="small">No saved notes yet.</div>`;
@@ -1304,6 +1310,9 @@
       selectedNamePill.textContent = `${k.emoji || "🐾"} ${k.name}`;
       selectedSub.textContent = `${k.tag || ""}${k.description ? " • " + k.description : ""}`.trim() || "—";
 
+      // Always-visible selected gallery subtitle
+      selPhotoSub.textContent = `Photos for ${k.name}`;
+
       const digits = digitsForUnit();
 
       const last = latestWeighIn(k);
@@ -1343,6 +1352,7 @@
         `;
       }).join("");
 
+      // DETAIL PANEL (collapsible)
       selectedPanel.innerHTML = `
         <div class="kheader">
           <div class="row" style="align-items:center;">
@@ -1472,22 +1482,9 @@
             </div>
           </div>
         </div>
-
-        <div class="card" style="box-shadow:none; background: rgba(255,255,255,.55); margin-top: 14px;">
-          <div class="head" style="border-bottom:none;">
-            <div><h2>Photo gallery</h2><div class="small">Photos for ${escapeHtml(k.name)}</div></div>
-            <div class="row" style="justify-content:flex-end;">
-              <input id="k_photoFile" type="file" accept="image/*" style="max-width:260px;" />
-              <button class="btn pink" id="k_uploadPhotoBtn">📸 Add photo</button>
-            </div>
-          </div>
-          <div class="body">
-            <div id="k_gallery" class="gallery"></div>
-            <div class="small" style="margin-top:8px;">(Admin unlock required to add or delete.)</div>
-          </div>
-        </div>
       `;
 
+      // chart focus buttons
       document.getElementById("focusOnlyBtn").addEventListener("click", () => {
         allToggle.checked = false;
         rebuildCharts();
@@ -1538,7 +1535,6 @@
         const t = (document.getElementById("a_note_new").value || "").trim();
         if (!t) return;
 
-        // createdAt is the note ID
         k.adopter.notesEntries.unshift({ createdAt: nowISO(), text: t });
         document.getElementById("a_note_new").value = "";
 
@@ -1560,7 +1556,7 @@
         renderAll(false);
       });
 
-      // ✅ Edit/Delete notes (kitten + adopter)
+      // Edit/Delete notes (kitten + adopter)
       selectedPanel.querySelectorAll("[data-note-edit]").forEach(btn => {
         btn.addEventListener("click", () => {
           if (!canEdit()) return;
@@ -1605,17 +1601,13 @@
         });
       });
 
-      // Photos
-      const kFile = document.getElementById("k_photoFile");
-      const kUpload = document.getElementById("k_uploadPhotoBtn");
-      const kGallery = document.getElementById("k_gallery");
-
-      kFile.disabled = !canEdit();
-      kUpload.disabled = !canEdit();
+      // ALWAYS-VISIBLE selected kitten gallery (separate container)
+      selPhotoFile.disabled = !canEdit();
+      selUploadBtn.disabled = !canEdit();
 
       renderGallery({
         photos: k.photos,
-        containerEl: kGallery,
+        containerEl: selGallery,
         allowDelete: canEdit(),
         onDelete: (idx) => {
           if (!canEdit()) return;
@@ -1628,14 +1620,17 @@
         onView: (items, idx) => openImgDialog({ items, idx, title: `${k.name} • Photo` })
       });
 
-      kUpload.addEventListener("click", async () => {
+      // overwrite handler each render (prevents stacking)
+      selUploadBtn.onclick = async () => {
         if (!canEdit()) return;
-        const f = kFile.files?.[0];
+        const f = selPhotoFile.files?.[0];
         if (!f) { alert("Choose a photo first."); return; }
+
         try {
           setStatus("saving", "Uploading photo…");
           const out = await uploadPhotoToDrive({ kittenId: k.id, file: f });
           k.photos.unshift({ url: out.url, fileId: out.fileId || "", addedAt: nowISO() });
+
           saveLocal();
           markDirtyAndScheduleSave();
           renderAll(false);
@@ -1644,9 +1639,11 @@
           setStatus("error", "Upload failed");
           alert(String(e?.message || e));
         } finally {
-          kFile.value = "";
+          selPhotoFile.value = "";
         }
-      });
+      };
+
+      applySelectedCollapseUI();
     };
 
     const renderLitterGallery = () => {
@@ -1813,6 +1810,8 @@
     const init = async () => {
       renderStatus();
       bornDateEl.textContent = state.litterBirthDateISO;
+
+      applySelectedCollapseUI();
 
       tickAge();
       setInterval(tickAge, 1000);
