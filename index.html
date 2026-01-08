@@ -288,14 +288,6 @@
       cursor:pointer;
     }
 
-    /* ✅ gallery inner containers so each gallery is isolated */
-    .galleryContainer{
-      border: 1px dashed rgba(31,36,48,.12);
-      border-radius: 18px;
-      background: rgba(255,255,255,.55);
-      padding: 10px;
-    }
-
     dialog#imgDialog{
       border:none;border-radius:22px;padding:0;
       width:min(860px,92vw);
@@ -322,6 +314,7 @@
     }
     .imgNavBtn:disabled{ opacity:.5; cursor:not-allowed; }
 
+    /* Weigh-in list (no tables) */
     .weighList{
       display:flex;
       flex-direction: column;
@@ -352,10 +345,16 @@
     .weighItem .lbl{ font-size: 11px; color: var(--muted); font-weight: 900; }
     .weighItem .val{ margin-top: 2px; font-size: 13px; font-weight: 800; }
 
+    /* Note actions */
     .noteActions{ display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; margin-top:8px; }
 
-    /* Collapsible selected */
-    details#selectedDetails summary{ list-style:none; cursor:pointer; }
+    /* ----------------------------
+       ✅ COLLAPSIBLE "Selected kitten"
+       ---------------------------- */
+    details#selectedDetails summary{
+      list-style:none;
+      cursor:pointer;
+    }
     details#selectedDetails summary::-webkit-details-marker{ display:none; }
     .detailsChevron{
       width: 26px;
@@ -371,7 +370,9 @@
       transition: transform .18s ease;
       user-select:none;
     }
-    details#selectedDetails[open] .detailsChevron{ transform: rotate(180deg); }
+    details#selectedDetails[open] .detailsChevron{
+      transform: rotate(180deg);
+    }
     .summaryRow{
       display:flex;
       align-items:center;
@@ -472,7 +473,7 @@
           </div>
         </div>
 
-        <!-- ✅ COLLAPSIBLE SELECTED KITTEN (no photos inside anymore) -->
+        <!-- ✅ COLLAPSIBLE SELECTED KITTEN CARD -->
         <div class="card" style="grid-column: 1 / -1;">
           <details id="selectedDetails" open>
             <summary>
@@ -495,27 +496,6 @@
           </details>
         </div>
 
-        <!-- ✅ NEW: Selected kitten photos in its own ALWAYS-VISIBLE container/card -->
-        <div class="card" style="grid-column: 1 / -1;">
-          <div class="head">
-            <div>
-              <h2>Selected kitten photos</h2>
-              <div class="small" id="selPhotoSub">—</div>
-            </div>
-            <div class="row" style="justify-content:flex-end;">
-              <input id="sel_photoFile" type="file" accept="image/*" style="max-width:260px;" />
-              <button class="btn pink" id="sel_uploadPhotoBtn">📸 Add photo</button>
-            </div>
-          </div>
-          <div class="body">
-            <div class="galleryContainer">
-              <div id="sel_gallery" class="gallery"></div>
-            </div>
-            <div class="small" style="margin-top:8px;">(Admin unlock required to add or delete.)</div>
-          </div>
-        </div>
-
-        <!-- Litter & Mom gallery in its own container -->
         <div class="card" style="grid-column: 1 / -1;">
           <div class="head">
             <div>
@@ -528,9 +508,7 @@
             </div>
           </div>
           <div class="body">
-            <div class="galleryContainer">
-              <div id="litterGallery" class="gallery"></div>
-            </div>
+            <div id="litterGallery" class="gallery"></div>
             <div class="small" style="margin-top:8px;">(Admin unlock required to add or delete.)</div>
           </div>
         </div>
@@ -958,18 +936,10 @@
       pie: document.getElementById("wrap-pie"),
     };
 
-    // Litter gallery elements
     const litterPhotoFile = document.getElementById("litterPhotoFile");
     const litterUploadBtn = document.getElementById("litterUploadBtn");
     const litterGallery = document.getElementById("litterGallery");
 
-    // ✅ Selected kitten gallery elements (always visible)
-    const selPhotoSub = document.getElementById("selPhotoSub");
-    const selPhotoFile = document.getElementById("sel_photoFile");
-    const selUploadBtn = document.getElementById("sel_uploadPhotoBtn");
-    const selGallery = document.getElementById("sel_gallery");
-
-    // Image dialog
     const imgDialog = document.getElementById("imgDialog");
     const imgDialogImg = document.getElementById("imgDialogImg");
     const imgDialogTitle = document.getElementById("imgDialogTitle");
@@ -984,9 +954,9 @@
      ***********************/
     let imgContext = { items: [], idx: 0, title: "Photo" };
 
-    // Upscale thumbnail in dialog
+    // ✅ FIX: Upscale the thumbnail (do NOT pull original)
     const getDialogSrc = (p) => {
-      if (p?.fileId) return driveThumbUrl(p.fileId, 1600);
+      if (p?.fileId) return driveThumbUrl(p.fileId, 1600); // upscale thumb for dialog
       return p?.url || "";
     };
 
@@ -1200,7 +1170,10 @@
      * NOTES (EDIT/DELETE)
      ***********************/
     const renderEntries = (entries, opts={}) => {
-      const { allowActions = false, scope = "k" } = opts;
+      const {
+        allowActions = false,
+        scope = "k",        // "k" kitten notes, "a" adopter notes
+      } = opts;
 
       const items = sortEntries(Array.isArray(entries) ? entries : []);
       if (!items.length) return `<div class="small">No saved notes yet.</div>`;
@@ -1324,22 +1297,12 @@
       }
     };
 
-    // helper: reset listeners on a static button (prevents stacking addEventListener on rerender)
-    const resetButton = (btn) => {
-      const clone = btn.cloneNode(true);
-      btn.parentNode.replaceChild(clone, btn);
-      return clone;
-    };
-
     const renderSelected = () => {
       const k = state.kittens.find(x => x.id === selectedId) || state.kittens[0];
       ensureKittenShape(k);
 
       selectedNamePill.textContent = `${k.emoji || "🐾"} ${k.name}`;
       selectedSub.textContent = `${k.tag || ""}${k.description ? " • " + k.description : ""}`.trim() || "—";
-
-      // ✅ Always-visible selected photo card subtitle
-      selPhotoSub.textContent = `Photos for ${k.name}`;
 
       const digits = digitsForUnit();
 
@@ -1509,6 +1472,20 @@
             </div>
           </div>
         </div>
+
+        <div class="card" style="box-shadow:none; background: rgba(255,255,255,.55); margin-top: 14px;">
+          <div class="head" style="border-bottom:none;">
+            <div><h2>Photo gallery</h2><div class="small">Photos for ${escapeHtml(k.name)}</div></div>
+            <div class="row" style="justify-content:flex-end;">
+              <input id="k_photoFile" type="file" accept="image/*" style="max-width:260px;" />
+              <button class="btn pink" id="k_uploadPhotoBtn">📸 Add photo</button>
+            </div>
+          </div>
+          <div class="body">
+            <div id="k_gallery" class="gallery"></div>
+            <div class="small" style="margin-top:8px;">(Admin unlock required to add or delete.)</div>
+          </div>
+        </div>
       `;
 
       document.getElementById("focusOnlyBtn").addEventListener("click", () => {
@@ -1520,6 +1497,7 @@
         rebuildCharts();
       });
 
+      // delete weigh-ins
       selectedPanel.querySelectorAll("[data-del-weigh]").forEach(btn => {
         btn.addEventListener("click", () => {
           if (!canEdit()) return;
@@ -1560,6 +1538,7 @@
         const t = (document.getElementById("a_note_new").value || "").trim();
         if (!t) return;
 
+        // createdAt is the note ID
         k.adopter.notesEntries.unshift({ createdAt: nowISO(), text: t });
         document.getElementById("a_note_new").value = "";
 
@@ -1581,6 +1560,7 @@
         renderAll(false);
       });
 
+      // ✅ Edit/Delete notes (kitten + adopter)
       selectedPanel.querySelectorAll("[data-note-edit]").forEach(btn => {
         btn.addEventListener("click", () => {
           if (!canEdit()) return;
@@ -1625,14 +1605,17 @@
         });
       });
 
-      // ✅ ALWAYS-VISIBLE Selected kitten gallery rendering + upload
-      selPhotoFile.disabled = !canEdit();
-      let newSelUploadBtn = resetButton(selUploadBtn); // prevent stacked listeners
-      newSelUploadBtn.disabled = !canEdit();
+      // Photos
+      const kFile = document.getElementById("k_photoFile");
+      const kUpload = document.getElementById("k_uploadPhotoBtn");
+      const kGallery = document.getElementById("k_gallery");
+
+      kFile.disabled = !canEdit();
+      kUpload.disabled = !canEdit();
 
       renderGallery({
         photos: k.photos,
-        containerEl: selGallery,
+        containerEl: kGallery,
         allowDelete: canEdit(),
         onDelete: (idx) => {
           if (!canEdit()) return;
@@ -1645,9 +1628,9 @@
         onView: (items, idx) => openImgDialog({ items, idx, title: `${k.name} • Photo` })
       });
 
-      newSelUploadBtn.addEventListener("click", async () => {
+      kUpload.addEventListener("click", async () => {
         if (!canEdit()) return;
-        const f = selPhotoFile.files?.[0];
+        const f = kFile.files?.[0];
         if (!f) { alert("Choose a photo first."); return; }
         try {
           setStatus("saving", "Uploading photo…");
@@ -1661,12 +1644,9 @@
           setStatus("error", "Upload failed");
           alert(String(e?.message || e));
         } finally {
-          selPhotoFile.value = "";
+          kFile.value = "";
         }
       });
-
-      // refresh the cached reference (since we replaced the button)
-      selUploadBtn = newSelUploadBtn;
     };
 
     const renderLitterGallery = () => {
@@ -1741,6 +1721,7 @@
       }
     });
 
+    // Date defaults to TODAY every time
     addWeighBtn.addEventListener("click", () => {
       if (!canEdit()) { alert("Admin unlock required."); return; }
       weighUnit.textContent = state.unit;
@@ -1850,8 +1831,7 @@
         setStatus("error", "Offline");
       }
 
-      rebuildCharts();
-      renderAll(false);
+      renderAll();
     };
 
     init();
