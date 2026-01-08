@@ -231,43 +231,68 @@
     .chartWrap{ height: 320px; }
     .chartWrap.short{ height: 260px; }
 
-    /* ---------- TABLE (SCROLL + STICKY DATE) ---------- */
+    /* ---------- TABLE (GUARANTEED H-SCROLL + STICKY DATE) ---------- */
     .tableScroll{
       display:block;
-      position:relative;
       width:100%;
       max-width:100%;
       overflow-x:auto;
-      overflow-y:hidden;
+      overflow-y:auto;
       -webkit-overflow-scrolling:touch;
       border-radius:18px;
       border: 1px solid rgba(31,36,48,.10);
       background: rgba(255,255,255,.6);
-      touch-action: pan-x;
+      position: relative;
+      max-height: 460px;
+      cursor: grab;
     }
+    .tableScroll.dragging{ cursor: grabbing; user-select:none; }
+
+    /* optional scrollbar styling (shows on many browsers) */
+    .tableScroll::-webkit-scrollbar{ height: 12px; width: 12px; }
+    .tableScroll::-webkit-scrollbar-thumb{
+      background: rgba(31,36,48,.20);
+      border-radius: 999px;
+      border: 3px solid rgba(255,255,255,.6);
+    }
+    .tableScroll::-webkit-scrollbar-track{ background: rgba(255,255,255,.35); border-radius: 999px; }
 
     table{
-      display:inline-table;     /* ✅ key: allows real overflow */
-      width:max-content;        /* ✅ key */
-      min-width:100%;
       border-collapse: separate;
       border-spacing: 0;
       background: transparent;
+      /* ✅ The key: table must be wider than container to scroll */
+      width: max-content;
+      /* fallback minimum so you always get overflow on desktop */
+      min-width: 1000px;
     }
-    th, td{ padding: 10px 10px; text-align:left; font-size: 13px; white-space: nowrap; }
-    th{ font-size: 12px; color: var(--muted); font-weight: 900; background: rgba(31,36,48,.03); }
+    th, td{
+      padding: 10px 10px;
+      text-align:left;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    th{
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 900;
+      background: rgba(31,36,48,.03);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
     tr+tr td{ border-top: 1px solid rgba(31,36,48,.06); }
     .right{ text-align:right; }
 
     th.sticky, td.sticky{
       position: sticky;
       left: 0;
-      z-index: 3;
+      z-index: 6;
       background: rgba(255,255,255,.92);
       border-right: 1px solid rgba(31,36,48,.06);
     }
     th.sticky{
-      z-index: 4;
+      z-index: 7;
       background: rgba(31,36,48,.03);
     }
 
@@ -374,7 +399,6 @@
             🎂 Born: <span id="bornDate">—</span>
           </span>
 
-          <!-- ✅ new: adoption countdown -->
           <span class="pill" title="Countdown to 6 weeks (adoption)">
             🏁 Adoptable in: <span id="adoptTicker" style="font-weight:900;">—</span>
           </span>
@@ -431,11 +455,15 @@
 
               <div id="wrap-table" style="display:none;">
                 <div class="small" style="margin-bottom:8px;">All kitten weights by date</div>
-                <!-- ✅ FIX: real horizontal scroll container -->
-                <div class="tableScroll" tabindex="0" aria-label="Scrollable weights table">
+
+                <!-- ✅ Guaranteed scroll: overflow + drag-to-scroll -->
+                <div class="tableScroll" id="weightsTableScroll" tabindex="0" aria-label="Scrollable weights table">
                   <table id="weightsTable"></table>
                 </div>
-                <div class="small" style="margin-top:8px;">Tip: Hold Shift + scroll wheel (or trackpad) to scroll sideways.</div>
+
+                <div class="small" style="margin-top:8px;">
+                  Tip: Scroll sideways, or click and drag the table left/right.
+                </div>
               </div>
             </div>
           </div>
@@ -521,7 +549,6 @@
     </form>
   </dialog>
 
-  <!-- ✅ Updated dialog: next/prev + close -->
   <dialog id="imgDialog">
     <div style="background:rgba(255,255,255,.96);border:1px solid rgba(31,36,48,.14);">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 12px;border-bottom:1px solid rgba(31,36,48,.10);">
@@ -546,14 +573,11 @@
     const BACKEND_URL = "https://script.google.com/macros/s/AKfycbywFoKrm8lye1kfiT8q9Mgu6hEdQpJzQvWzw60tVR_BLE91bD8mdyJEmn9sZd6udg4coA/exec";
     const STORAGE_KEY = "kitten-growth-tracker:state:v2";
 
-    // ✅ Birth is Dec 30 at 6pm (America/New_York offset)
+    // Birth is Dec 30 at 6pm (America/New_York offset)
     const LITTER_BIRTHDATETIME_ISO = "2025-12-30T18:00:00-05:00";
-    const LITTER_BIRTHDATE_ISO = "2025-12-30"; // for display + day labeling
-
-    // ✅ Adoption countdown: 6 weeks from birth datetime
+    const LITTER_BIRTHDATE_ISO = "2025-12-30";
     const ADOPTION_WEEKS = 6;
 
-    // Admin unlock code
     const ADMIN_CODE = "McRae";
     const ADMIN_KEY = "kitten-growth-tracker:admin:v1";
 
@@ -564,48 +588,36 @@
       unit: "oz",
       litterBirthDateISO: LITTER_BIRTHDATE_ISO,
       litterBirthDateTimeISO: LITTER_BIRTHDATETIME_ISO,
-      litterMomPhotos: [], // [{url, fileId, addedAt}]
+      litterMomPhotos: [],
       kittens: [
         { id:"orange", name:"Orange", emoji:"🐱", tag:"Orange", description:"", status:"Available",
           adopter:{name:"",email:"",phone:"",notesEntries:[]},
-          notesEntries:[],
-          photos:[],
-          milestones:[],
+          notesEntries:[], photos:[], milestones:[],
           weighIns:[{date:"2026-01-01",oz:4.88},{date:"2026-01-03",oz:6.03},{date:"2026-01-05",oz:7.13}]
         },
         { id:"blackie", name:"Blackie", emoji:"🐈‍⬛", tag:"Black", description:"", status:"Available",
           adopter:{name:"",email:"",phone:"",notesEntries:[]},
-          notesEntries:[],
-          photos:[],
-          milestones:[],
+          notesEntries:[], photos:[], milestones:[],
           weighIns:[{date:"2026-01-01",oz:3.877},{date:"2026-01-03",oz:5.407},{date:"2026-01-05",oz:6.63}]
         },
         { id:"tux", name:"Tux", emoji:"🎩", tag:"Tux", description:"", status:"Available",
           adopter:{name:"",email:"",phone:"",notesEntries:[]},
-          notesEntries:[],
-          photos:[],
-          milestones:[],
+          notesEntries:[], photos:[], milestones:[],
           weighIns:[{date:"2026-01-01",oz:5.255},{date:"2026-01-03",oz:6.49},{date:"2026-01-05",oz:7.5}]
         },
         { id:"tux2", name:"Tux 2", emoji:"🧦", tag:"Tux", description:"White stripe on left leg", status:"Available",
           adopter:{name:"",email:"",phone:"",notesEntries:[]},
-          notesEntries:[],
-          photos:[],
-          milestones:[],
+          notesEntries:[], photos:[], milestones:[],
           weighIns:[{date:"2026-01-01",oz:5.04},{date:"2026-01-03",oz:6.48},{date:"2026-01-05",oz:7.17}]
         },
         { id:"tortie", name:"Tortie", emoji:"🍂", tag:"Tortie", description:"", status:"Available",
           adopter:{name:"",email:"",phone:"",notesEntries:[]},
-          notesEntries:[],
-          photos:[],
-          milestones:[],
+          notesEntries:[], photos:[], milestones:[],
           weighIns:[{date:"2026-01-01",oz:4.38},{date:"2026-01-03",oz:5.65},{date:"2026-01-05",oz:7.0}]
         },
         { id:"calico", name:"Calico", emoji:"🌸", tag:"Calico", description:"", status:"Available",
           adopter:{name:"",email:"",phone:"",notesEntries:[]},
-          notesEntries:[],
-          photos:[],
-          milestones:[],
+          notesEntries:[], photos:[], milestones:[],
           weighIns:[{date:"2026-01-01",oz:4.504},{date:"2026-01-03",oz:6.1},{date:"2026-01-05",oz:7.06}]
         },
       ]
@@ -620,8 +632,6 @@
 
     const ozToG = (oz) => oz * 28.349523125;
     const gToOz = (g) => g / 28.349523125;
-
-    // ✅ pounds conversions
     const ozToLb = (oz) => oz / 16;
     const lbToOz = (lb) => lb * 16;
 
@@ -637,9 +647,7 @@
       return Math.round((b.getTime() - a.getTime()) / (1000*60*60*24));
     };
 
-    // ✅ time-based age ticker start
     const msSinceISO = (iso) => Date.now() - new Date(iso).getTime();
-
     const formatAge = (ms) => {
       const s = Math.max(0, Math.floor(ms/1000));
       const days = Math.floor(s/86400);
@@ -758,12 +766,9 @@
 
     const nowISO = () => new Date().toISOString();
 
-    // ✅ Drive helpers
-    // Thumbnails: smaller by default so they don’t look “scaled up”
+    // Drive helpers
     const driveThumbUrl = (fileId, width = 400) =>
       `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w${width}`;
-
-    // Full-size: use uc?id (more stable than huge thumbnail sizing)
     const driveViewUrl = (fileId) =>
       `https://drive.google.com/uc?id=${encodeURIComponent(fileId)}`;
 
@@ -867,7 +872,7 @@
 
       const data = await safeJson(res);
       if (!res.ok || !data.ok) throw new Error(data.error || `Upload failed (${res.status})`);
-      return data; // { ok, fileId, url, name }
+      return data;
     }
 
     function fileToCompressedBase64(file, maxSizePx, quality) {
@@ -941,6 +946,7 @@
     };
 
     const weightsTable = document.getElementById("weightsTable");
+    const weightsTableScroll = document.getElementById("weightsTableScroll");
 
     const litterPhotoFile = document.getElementById("litterPhotoFile");
     const litterUploadBtn = document.getElementById("litterUploadBtn");
@@ -956,12 +962,67 @@
     imgDialogClose.addEventListener("click", () => imgDialog.close());
 
     /***********************
+     * DRAG-TO-SCROLL (TABLE)
+     ***********************/
+    function enableDragScroll(el){
+      if (!el) return;
+      let isDown = false;
+      let startX = 0;
+      let startY = 0;
+      let startLeft = 0;
+      let startTop = 0;
+      let moved = false;
+
+      el.addEventListener("mousedown", (e) => {
+        isDown = true;
+        moved = false;
+        el.classList.add("dragging");
+        startX = e.pageX - el.offsetLeft;
+        startY = e.pageY - el.offsetTop;
+        startLeft = el.scrollLeft;
+        startTop = el.scrollTop;
+      });
+
+      window.addEventListener("mouseup", () => {
+        isDown = false;
+        el.classList.remove("dragging");
+      });
+
+      el.addEventListener("mouseleave", () => {
+        isDown = false;
+        el.classList.remove("dragging");
+      });
+
+      el.addEventListener("mousemove", (e) => {
+        if (!isDown) return;
+        e.preventDefault();
+        const x = e.pageX - el.offsetLeft;
+        const y = e.pageY - el.offsetTop;
+        const walkX = (x - startX);
+        const walkY = (y - startY);
+        if (Math.abs(walkX) > 2 || Math.abs(walkY) > 2) moved = true;
+        el.scrollLeft = startLeft - walkX;
+        el.scrollTop = startTop - walkY;
+      });
+
+      // prevent click-through selecting text if you dragged
+      el.addEventListener("click", (e) => {
+        if (moved) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }, true);
+    }
+
+    enableDragScroll(weightsTableScroll);
+
+    /***********************
      * IMAGE DIALOG CYCLING
      ***********************/
     let imgContext = { items: [], idx: 0, title: "Photo" };
 
-    const getDialogSrc = (p, widthThumb=2000) => {
-      if (p?.fileId) return driveViewUrl(p.fileId); // ✅ full view: stable
+    const getDialogSrc = (p) => {
+      if (p?.fileId) return driveViewUrl(p.fileId);
       return p?.url || "";
     };
 
@@ -1023,7 +1084,7 @@
       return all ? state.kittens : state.kittens.filter(k => k.id === selectedId);
     };
 
-    const digitsForUnit = () => (state.unit === "g" ? 1 : (state.unit === "lb" ? 3 : 3));
+    const digitsForUnit = () => (state.unit === "g" ? 1 : 3);
 
     const buildGrowthData = () => {
       const dates = allDates();
@@ -1176,14 +1237,21 @@
       const dates = allDates();
       const kittens = state.kittens;
 
+      // ✅ force table min-width to guarantee overflow
+      const dateW = 160;
+      const kittenW = 140;
+      const avgW = 120;
+      const minW = dateW + (kittens.length * kittenW) + avgW + 40;
+      weightsTable.style.minWidth = minW + "px";
+
       const digits = digitsForUnit();
 
       const thead = `
         <thead>
           <tr>
-            <th class="sticky" style="min-width:140px;">Date</th>
-            ${kittens.map(k => `<th style="min-width:120px;">${escapeHtml(k.name)}</th>`).join("")}
-            <th class="right" style="min-width:120px;">Avg</th>
+            <th class="sticky" style="min-width:${dateW}px;">Date</th>
+            ${kittens.map(k => `<th style="min-width:${kittenW}px;">${escapeHtml(k.name)}</th>`).join("")}
+            <th class="right" style="min-width:${avgW}px;">Avg</th>
           </tr>
         </thead>
       `;
@@ -1226,7 +1294,6 @@
         const digits = digitsForUnit();
         const deltaText = delta == null ? "" : `${delta >= 0 ? "+" : ""}${fmt(delta, digits)} ${state.unit}`;
 
-        // ✅ show reserver/adopter name on roster when present
         const hasPerson = (k.adopter?.name || "").trim().length > 0 && (k.status === "Reserved" || k.status === "Adopted");
         const whoLabel = k.status === "Adopted" ? "adopted by" : "reserved by";
         const whoText = hasPerson ? ` • ${whoLabel}: ${escapeHtml(k.adopter.name)}` : "";
@@ -1327,7 +1394,6 @@
       selectedSub.textContent = `${k.tag || ""}${k.description ? " • " + k.description : ""}`.trim() || "—";
 
       const digits = digitsForUnit();
-
       const last = latestWeighIn(k);
       const prev = prevWeighIn(k);
       const lastV = last ? getVal(last) : null;
@@ -1376,7 +1442,7 @@
           <div class="stat"><div class="t">Latest weight</div><div class="v">${lastV == null ? "—" : fmt(lastV, digits)} ${state.unit}</div><div class="s">${escapeHtml(last?.date || "")}</div></div>
           <div class="stat"><div class="t">Age at latest</div><div class="v">${ageDays == null ? "—" : ageDays} days</div><div class="s">born ${escapeHtml(state.litterBirthDateISO)}</div></div>
           <div class="stat"><div class="t">Change since last</div><div class="v">${delta == null ? "—" : `${delta >= 0 ? "+" : ""}${fmt(delta, digits)} ${state.unit}`}</div><div class="s">${prev ? `${escapeHtml(prev.date)} → ${escapeHtml(last?.date || "")}` : ""}</div></div>
-          <div class="stat"><div class="t">Avg / day</div><div class="v">${deltaPerDay == null ? "—" : fmt(deltaPerDay, digitsForUnit())} ${state.unit}/day</div><div class="s">(last interval)</div></div>
+          <div class="stat"><div class="t">Avg / day</div><div class="v">${deltaPerDay == null ? "—" : fmt(deltaPerDay, digits)} ${state.unit}/day</div><div class="s">(last interval)</div></div>
         </div>
 
         <div class="two" style="margin-top: 14px;">
@@ -1459,7 +1525,7 @@
           <div class="card" style="box-shadow:none; background: rgba(255,255,255,.55);">
             <div class="head" style="border-bottom:none;"><div><h2>Weigh-ins</h2><div class="small">Date • age (days) • weight</div></div></div>
             <div class="body">
-              <table style="display:table;width:100%;min-width:0;">
+              <table style="width:100%;min-width:0;">
                 <thead>
                   <tr><th style="width: 30%">Date</th><th style="width: 18%">Age (days)</th><th>Weight</th><th class="right" style="width: 110px;">Action</th></tr>
                 </thead>
@@ -1592,9 +1658,7 @@
           markDirtyAndScheduleSave();
           renderAll(false);
         },
-        onView: (items, idx) => {
-          openImgDialog({ items, idx, title: `${k.name} • Photo` });
-        }
+        onView: (items, idx) => openImgDialog({ items, idx, title: `${k.name} • Photo` })
       });
 
       kUpload.addEventListener("click", async () => {
@@ -1634,16 +1698,13 @@
           markDirtyAndScheduleSave();
           renderAll(false);
         },
-        onView: (items, idx) => {
-          openImgDialog({ items, idx, title: `Litter & Mom • Photo` });
-        }
+        onView: (items, idx) => openImgDialog({ items, idx, title: `Litter & Mom • Photo` })
       });
     };
 
     const renderAll = (rebuild=true) => {
       unitSelect.value = state.unit;
       bornDateEl.textContent = state.litterBirthDateISO;
-
       adminBtn.textContent = isAdmin() ? "🔓 Admin" : "🔒 Admin";
 
       renderRoster();
