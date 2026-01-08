@@ -232,27 +232,41 @@
     .chartWrap{ height: 320px; }
     .chartWrap.short{ height: 260px; }
 
-    table{
-      width: 100%;
-      border-collapse: collapse;
-      overflow:hidden;
+    /* ✅ Table scroll + frozen Date column */
+    .tableScroll{
+      overflow-x: auto;
+      overflow-y: hidden;
+      max-width: 100%;
+      -webkit-overflow-scrolling: touch;
       border-radius: 18px;
       border: 1px solid rgba(31,36,48,.10);
       background: rgba(255,255,255,.6);
     }
-    th, td{ padding: 10px 10px; text-align:left; font-size: 13px; }
+
+    table{
+      width: max-content; /* ✅ allow content to exceed container so horizontal scroll happens */
+      min-width: 100%;
+      border-collapse: collapse;
+      border-radius: 18px;
+      background: transparent;
+    }
+
+    th, td{ padding: 10px 10px; text-align:left; font-size: 13px; white-space: nowrap; }
     th{ font-size: 12px; color: var(--muted); font-weight: 900; background: rgba(31,36,48,.03); }
     tr+tr td{ border-top: 1px solid rgba(31,36,48,.06); }
     .right{ text-align:right; }
 
-    /* ✅ Table view scrolling improvements */
-    .tableScroll{
-      overflow: auto;
-      -webkit-overflow-scrolling: touch;
-      border-radius: 18px;
+    /* Freeze first column */
+    th.sticky, td.sticky{
+      position: sticky;
+      left: 0;
+      z-index: 3;
+      background: rgba(255,255,255,.92);
+      border-right: 1px solid rgba(31,36,48,.06);
     }
-    #weightsTable{
-      min-width: 860px; /* ensures horizontal scroll is available when many columns */
+    th.sticky{
+      z-index: 4;
+      background: rgba(31,36,48,.03);
     }
 
     .footer{ padding: 14px 18px 18px; color: var(--muted); font-size: 12px; }
@@ -312,7 +326,7 @@
       cursor:pointer;
     }
 
-    /* ✅ Image dialog: prevent big desktop images running off screen */
+    /* ✅ Image dialog: keep big images on screen + allow cycle controls */
     dialog#imgDialog{
       border:none; border-radius:22px; padding:0;
       width:min(860px,92vw);
@@ -322,16 +336,24 @@
     }
     #imgDialog .imgBody{
       padding:12px;
-      max-height: calc(92vh - 56px);
+      max-height: calc(92vh - 62px);
       overflow:auto;
     }
     #imgDialogImg{
       display:block;
       width: 100%;
       height: auto;
-      max-height: 78vh;     /* key: keep it on screen */
-      object-fit: contain;  /* key: contain rather than overflow */
+      max-height: 78vh;
+      object-fit: contain;
       margin: 0 auto;
+    }
+    .iconBtn{
+      padding: 8px 10px;
+      min-width: 42px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
     }
   </style>
 </head>
@@ -350,7 +372,6 @@
             ⏱️ Litter age: <span id="ageTicker" style="font-weight:900;">—</span>
           </span>
 
-          <!-- ✅ New: countdown to adoption (6 weeks) -->
           <span class="pill" title="Countdown until 6 weeks from birth time">
             🗓️ Adoptable in: <span id="adoptTicker" style="font-weight:900;">—</span>
           </span>
@@ -410,7 +431,7 @@
               <div class="chartWrap short" id="wrap-pie" style="display:none;"><canvas id="chartPie"></canvas></div>
 
               <div id="wrap-table" style="display:none;">
-                <div class="small" style="margin-bottom:8px;">All kitten weights by date</div>
+                <div class="small" style="margin-bottom:8px;">All kitten weights by date (scroll →, Date stays frozen)</div>
                 <div class="tableScroll">
                   <table id="weightsTable"></table>
                 </div>
@@ -503,7 +524,11 @@
     <div style="background:rgba(255,255,255,.96);border:1px solid rgba(31,36,48,.14);">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 12px;border-bottom:1px solid rgba(31,36,48,.10);">
         <div style="font-family:Fredoka, Nunito;font-size:16px;font-weight:600;" id="imgDialogTitle">Photo</div>
-        <button class="btn" id="imgDialogClose">✖</button>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="btn iconBtn" id="imgPrev" title="Previous photo" type="button">◀</button>
+          <button class="btn iconBtn" id="imgNext" title="Next photo" type="button">▶</button>
+          <button class="btn iconBtn" id="imgDialogClose" title="Close" type="button">✖</button>
+        </div>
       </div>
       <div class="imgBody">
         <img id="imgDialogImg" alt="Photo" style="border-radius:18px;border:1px solid rgba(31,36,48,.10);background:rgba(255,255,255,.6);" />
@@ -518,15 +543,12 @@
     const BACKEND_URL = "https://script.google.com/macros/s/AKfycbywFoKrm8lye1kfiT8q9Mgu6hEdQpJzQvWzw60tVR_BLE91bD8mdyJEmn9sZd6udg4coA/exec";
     const STORAGE_KEY = "kitten-growth-tracker:state:v2";
 
-    // ✅ Birth moment: Dec 30th @ 6:00 PM (America/New_York)
-    // This includes an explicit offset so it behaves consistently.
+    // Birth moment: Dec 30 @ 6:00 PM (explicit offset so the clock is consistent)
     const LITTER_BIRTH_MOMENT_ISO = "2025-12-30T18:00:00-05:00";
 
-    // Admin unlock code (as you requested)
     const ADMIN_CODE = "McRae";
     const ADMIN_KEY = "kitten-growth-tracker:admin:v1";
 
-    // ✅ Adoption eligibility: 6 weeks from birth moment
     const ADOPT_WEEKS = 6;
 
     /***********************
@@ -534,49 +556,37 @@
      ***********************/
     const SEED = {
       unit: "oz",
-      litterBirthDateISO: LITTER_BIRTH_MOMENT_ISO, // now includes time
-      litterMomPhotos: [], // [{url, fileId, addedAt}]
+      litterBirthDateISO: LITTER_BIRTH_MOMENT_ISO,
+      litterMomPhotos: [],
       kittens: [
         { id:"orange", name:"Orange", emoji:"🐱", tag:"Orange", description:"", status:"Available",
           adopter:{name:"",email:"",phone:"",notesEntries:[]},
-          notesEntries:[],
-          photos:[], // [{url, fileId, addedAt}]
-          milestones:[],
+          notesEntries:[], photos:[], milestones:[],
           weighIns:[{date:"2026-01-01",oz:4.88},{date:"2026-01-03",oz:6.03},{date:"2026-01-05",oz:7.13}]
         },
         { id:"blackie", name:"Blackie", emoji:"🐈‍⬛", tag:"Black", description:"", status:"Available",
           adopter:{name:"",email:"",phone:"",notesEntries:[]},
-          notesEntries:[],
-          photos:[],
-          milestones:[],
+          notesEntries:[], photos:[], milestones:[],
           weighIns:[{date:"2026-01-01",oz:3.877},{date:"2026-01-03",oz:5.407},{date:"2026-01-05",oz:6.63}]
         },
         { id:"tux", name:"Tux", emoji:"🎩", tag:"Tux", description:"", status:"Available",
           adopter:{name:"",email:"",phone:"",notesEntries:[]},
-          notesEntries:[],
-          photos:[],
-          milestones:[],
+          notesEntries:[], photos:[], milestones:[],
           weighIns:[{date:"2026-01-01",oz:5.255},{date:"2026-01-03",oz:6.49},{date:"2026-01-05",oz:7.5}]
         },
         { id:"tux2", name:"Tux 2", emoji:"🧦", tag:"Tux", description:"White stripe on left leg", status:"Available",
           adopter:{name:"",email:"",phone:"",notesEntries:[]},
-          notesEntries:[],
-          photos:[],
-          milestones:[],
+          notesEntries:[], photos:[], milestones:[],
           weighIns:[{date:"2026-01-01",oz:5.04},{date:"2026-01-03",oz:6.48},{date:"2026-01-05",oz:7.17}]
         },
         { id:"tortie", name:"Tortie", emoji:"🍂", tag:"Tortie", description:"", status:"Available",
           adopter:{name:"",email:"",phone:"",notesEntries:[]},
-          notesEntries:[],
-          photos:[],
-          milestones:[],
+          notesEntries:[], photos:[], milestones:[],
           weighIns:[{date:"2026-01-01",oz:4.38},{date:"2026-01-03",oz:5.65},{date:"2026-01-05",oz:7.0}]
         },
         { id:"calico", name:"Calico", emoji:"🌸", tag:"Calico", description:"", status:"Available",
           adopter:{name:"",email:"",phone:"",notesEntries:[]},
-          notesEntries:[],
-          photos:[],
-          milestones:[],
+          notesEntries:[], photos:[], milestones:[],
           weighIns:[{date:"2026-01-01",oz:4.504},{date:"2026-01-03",oz:6.1},{date:"2026-01-05",oz:7.06}]
         },
       ]
@@ -591,7 +601,6 @@
 
     const ozToG = (oz) => oz * 28.349523125;
     const gToOz = (g) => g / 28.349523125;
-
     const ozToLb = (oz) => oz / 16;
     const lbToOz = (lb) => lb * 16;
 
@@ -603,7 +612,6 @@
 
     const dateOnly = (isoLike) => String(isoLike || "").split("T")[0];
 
-    // Day difference based on calendar dates (not time-of-day)
     const dayDiffISO = (aISO, bISO) => {
       const a = new Date(dateOnly(aISO) + "T00:00:00");
       const b = new Date(dateOnly(bISO) + "T00:00:00");
@@ -637,7 +645,7 @@
       if (!w) return null;
       if (state.unit === "g") return ozToG(w.oz);
       if (state.unit === "lb") return ozToLb(w.oz);
-      return w.oz; // oz
+      return w.oz;
     };
 
     const ensureKittenShape = (k) => {
@@ -739,18 +747,20 @@
       return d.toLocaleString(undefined, { year:"numeric", month:"short", day:"numeric", hour:"numeric", minute:"2-digit" });
     };
 
-    const addWeeks = (iso, weeks) => {
+    const addWeeksISO = (iso, weeks) => {
       const d = new Date(iso);
       d.setTime(d.getTime() + weeks * 7 * 24 * 60 * 60 * 1000);
       return d.toISOString();
     };
 
-    // ✅ Drive helpers (thumb stays intentionally scaled-up)
+    // Drive helpers (thumb stays intentionally scaled)
     const driveThumbUrl = (fileId, width = 800) =>
       `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w${width}`;
 
     const driveViewUrl = (fileId) =>
       `https://drive.google.com/uc?id=${encodeURIComponent(fileId)}`;
+
+    const fullSrcFor = (p) => (p?.fileId ? driveThumbUrl(p.fileId, 2000) : (p?.url || ""));
 
     /***********************
      * ADMIN
@@ -852,7 +862,7 @@
 
       const data = await safeJson(res);
       if (!res.ok || !data.ok) throw new Error(data.error || `Upload failed (${res.status})`);
-      return data; // { ok, fileId, url, name }
+      return data;
     }
 
     function fileToCompressedBase64(file, maxSizePx, quality) {
@@ -935,8 +945,58 @@
     const imgDialogImg = document.getElementById("imgDialogImg");
     const imgDialogTitle = document.getElementById("imgDialogTitle");
     const imgDialogClose = document.getElementById("imgDialogClose");
+    const imgPrev = document.getElementById("imgPrev");
+    const imgNext = document.getElementById("imgNext");
 
+    /***********************
+     * PHOTO CYCLING (dialog)
+     ***********************/
+    let activeGallery = { items: [], index: 0, title: "Photo" };
+
+    const openGalleryAt = ({ items, index, title }) => {
+      const safeItems = Array.isArray(items) ? items : [];
+      if (!safeItems.length) return;
+
+      activeGallery.items = safeItems;
+      activeGallery.index = Math.max(0, Math.min(safeItems.length - 1, Number(index) || 0));
+      activeGallery.title = title || "Photo";
+
+      renderActivePhoto();
+      imgDialog.showModal();
+    };
+
+    const renderActivePhoto = () => {
+      const items = activeGallery.items || [];
+      const i = activeGallery.index || 0;
+      const p = items[i];
+      if (!p) return;
+
+      imgDialogTitle.textContent = `${activeGallery.title} • ${i+1}/${items.length}`;
+      imgDialogImg.src = fullSrcFor(p);
+
+      imgPrev.disabled = items.length <= 1;
+      imgNext.disabled = items.length <= 1;
+    };
+
+    const stepPhoto = (dir) => {
+      const items = activeGallery.items || [];
+      if (items.length <= 1) return;
+      const n = items.length;
+      activeGallery.index = (activeGallery.index + dir + n) % n;
+      renderActivePhoto();
+    };
+
+    imgPrev.addEventListener("click", () => stepPhoto(-1));
+    imgNext.addEventListener("click", () => stepPhoto(+1));
     imgDialogClose.addEventListener("click", () => imgDialog.close());
+
+    // keyboard support while dialog is open
+    window.addEventListener("keydown", (e) => {
+      if (!imgDialog.open) return;
+      if (e.key === "ArrowLeft") { e.preventDefault(); stepPhoto(-1); }
+      if (e.key === "ArrowRight") { e.preventDefault(); stepPhoto(+1); }
+      if (e.key === "Escape") { imgDialog.close(); }
+    });
 
     /***********************
      * CHARTS
@@ -1107,13 +1167,12 @@
     const renderWeightsTable = () => {
       const dates = allDates();
       const kittens = state.kittens;
-
       const digits = digitsForUnit(state.unit);
 
       const thead = `
         <thead>
           <tr>
-            <th style="min-width:140px;">Date</th>
+            <th class="sticky" style="min-width:140px;">Date</th>
             ${kittens.map(k => `<th style="min-width:120px;">${escapeHtml(k.name)}</th>`).join("")}
             <th class="right" style="min-width:120px;">Avg</th>
           </tr>
@@ -1131,7 +1190,7 @@
 
         return `
           <tr>
-            <td>${escapeHtml(d)}</td>
+            <td class="sticky">${escapeHtml(d)}</td>
             ${vals.map(x => `<td>${escapeHtml(x.text)}</td>`).join("")}
             <td class="right">${avg == null ? "—" : fmt(avg, digits)}</td>
           </tr>
@@ -1158,7 +1217,6 @@
         const digits = digitsForUnit(state.unit);
         const deltaText = delta == null ? "" : `${delta >= 0 ? "+" : ""}${fmt(delta, digits)} ${state.unit}`;
 
-        // ✅ Show reserver/adopter name on roster card when present
         const personName = (k.adopter?.name || "").trim();
         const showPerson = personName && (k.status === "Reserved" || k.status === "Adopted");
         const personLabel = k.status === "Reserved" ? "reserved by" : "adopted by";
@@ -1196,14 +1254,10 @@
       });
     };
 
-    // uses Drive thumbnail when fileId exists (intentionally scaled preview)
     const renderGallery = ({ photos, containerEl, allowDelete, onDelete, onView }) => {
       const items = Array.isArray(photos) ? photos : [];
 
-      const thumbSrcFor = (p) => {
-        if (p?.fileId) return driveThumbUrl(p.fileId, 800);
-        return p?.url || "";
-      };
+      const thumbSrcFor = (p) => (p?.fileId ? driveThumbUrl(p.fileId, 800) : (p?.url || ""));
 
       containerEl.innerHTML = items.map((p, idx) => {
         const src = escapeHtml(thumbSrcFor(p));
@@ -1222,7 +1276,7 @@
           if (x != null) return;
           const p = items[idx];
           if (!p) return;
-          onView(p, idx);
+          onView(p, idx, items);
         });
       });
 
@@ -1392,7 +1446,7 @@
           <div class="card" style="box-shadow:none; background: rgba(255,255,255,.55);">
             <div class="head" style="border-bottom:none;"><div><h2>Weigh-ins</h2><div class="small">Date • age (days) • weight</div></div></div>
             <div class="body">
-              <table>
+              <table style="width:100%;min-width:0;">
                 <thead>
                   <tr><th style="width: 30%">Date</th><th style="width: 18%">Age (days)</th><th>Weight</th><th class="right" style="width: 110px;">Action</th></tr>
                 </thead>
@@ -1525,10 +1579,12 @@
           markDirtyAndScheduleSave();
           renderAll(false);
         },
-        onView: (p) => {
-          imgDialogTitle.textContent = `${k.name} • Photo`;
-          imgDialogImg.src = p.fileId ? driveThumbUrl(p.fileId, 2000) : p.url; // intentionally scaled preview
-          imgDialog.showModal();
+        onView: (_p, idx, items) => {
+          openGalleryAt({
+            items,
+            index: idx,
+            title: `${k.name} • Photo`
+          });
         }
       });
 
@@ -1569,10 +1625,12 @@
           markDirtyAndScheduleSave();
           renderAll(false);
         },
-        onView: (p) => {
-          imgDialogTitle.textContent = `Litter & Mom • Photo`;
-          imgDialogImg.src = p.fileId ? driveThumbUrl(p.fileId, 2000) : p.url; // intentionally scaled preview
-          imgDialog.showModal();
+        onView: (_p, idx, items) => {
+          openGalleryAt({
+            items,
+            index: idx,
+            title: `Litter & Mom • Photo`
+          });
         }
       });
     };
@@ -1664,7 +1722,6 @@
         return;
       }
 
-      // ✅ Always store as ounces internally
       const oz =
         (state.unit === "g")  ? gToOz(num)  :
         (state.unit === "lb") ? lbToOz(num) :
@@ -1708,13 +1765,11 @@
      * AGE + ADOPTION TICKERS
      ***********************/
     const tickAgeAndCountdown = () => {
-      // Age since birth moment (Dec 30 @ 6pm)
       const age = formatDuration(msSinceISO(state.litterBirthDateISO));
       ageTickerEl.textContent =
         `${age.days}d ${String(age.hrs).padStart(2,"0")}h ${String(age.mins).padStart(2,"0")}m ${String(age.secs).padStart(2,"0")}s`;
 
-      // Countdown to adoptable moment (6 weeks)
-      const adoptAtISO = addWeeks(state.litterBirthDateISO, ADOPT_WEEKS);
+      const adoptAtISO = addWeeksISO(state.litterBirthDateISO, ADOPT_WEEKS);
       const msLeft = new Date(adoptAtISO).getTime() - Date.now();
 
       if (msLeft <= 0) {
