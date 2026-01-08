@@ -31,12 +31,12 @@
       --bad: #a12121;
       --radius: 22px;
 
-      --cloud-idle: rgba(255,255,255,.65);
-      --cloud-loading: rgba(216,199,255,.65);
-      --cloud-saving: rgba(186,247,230,.65);
-      --cloud-synced: rgba(186,247,230,.75);
-      --cloud-dirty: rgba(255,183,209,.65);
-      --cloud-error: rgba(255,200,200,.65);
+      --pill-idle: rgba(255,255,255,.65);
+      --pill-loading: rgba(216,199,255,.65);
+      --pill-saving: rgba(186,247,230,.65);
+      --pill-synced: rgba(186,247,230,.75);
+      --pill-dirty: rgba(255,183,209,.65);
+      --pill-error: rgba(255,200,200,.65);
     }
 
     *{ box-sizing: border-box; }
@@ -109,12 +109,12 @@
       color: rgba(31,36,48,.8);
       backdrop-filter: blur(8px);
     }
-    .pill[data-cloud="idle"]{ background: var(--cloud-idle); }
-    .pill[data-cloud="loading"]{ background: var(--cloud-loading); }
-    .pill[data-cloud="saving"]{ background: var(--cloud-saving); }
-    .pill[data-cloud="synced"]{ background: var(--cloud-synced); }
-    .pill[data-cloud="dirty"]{ background: var(--cloud-dirty); }
-    .pill[data-cloud="error"]{ background: var(--cloud-error); }
+    .pill[data-status="idle"]{ background: var(--pill-idle); }
+    .pill[data-status="loading"]{ background: var(--pill-loading); }
+    .pill[data-status="saving"]{ background: var(--pill-saving); }
+    .pill[data-status="synced"]{ background: var(--pill-synced); }
+    .pill[data-status="dirty"]{ background: var(--pill-dirty); }
+    .pill[data-status="error"]{ background: var(--pill-error); }
 
     .btn{
       appearance:none;
@@ -230,14 +230,6 @@
     .charts{ display:grid; grid-template-columns: 1fr; gap: 12px; }
     .chartWrap{ height: 320px; }
     .chartWrap.short{ height: 260px; }
-    .hint{
-      font-size: 12px;
-      color: var(--muted);
-      background: rgba(255,255,255,.6);
-      border: 1px dashed rgba(31,36,48,.16);
-      border-radius: 18px;
-      padding: 10px 12px;
-    }
 
     table{
       width: 100%;
@@ -247,11 +239,10 @@
       border: 1px solid rgba(31,36,48,.10);
       background: rgba(255,255,255,.6);
     }
-    th, td{ padding: 10px 10px; text-align:left; font-size: 13px; }
-    th{ font-size: 12px; color: var(--muted); font-weight: 900; background: rgba(31,36,48,.03); }
+    th, td{ padding: 10px 10px; text-align:left; font-size: 13px; vertical-align: top; }
+    th{ font-size: 12px; color: var(--muted); font-weight: 900; background: rgba(31,36,48,.03); position: sticky; top: 0; z-index: 1; }
     tr+tr td{ border-top: 1px solid rgba(31,36,48,.06); }
 
-    .footer{ padding: 14px 18px 18px; color: var(--muted); font-size: 12px; }
     .kheader{ display:flex; align-items:center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
     .bigEmoji{ font-size: 30px; }
     .statRow{ display:grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
@@ -262,7 +253,47 @@
     .stat .s{ margin-top: 2px; font-size: 11px; color: var(--muted); }
 
     .miniActions{ display:flex; gap: 8px; flex-wrap: wrap; }
-    .fileInput{ display:none; }
+
+    .noteList{
+      margin-top: 10px;
+      display:grid;
+      gap: 8px;
+    }
+    .noteItem{
+      border: 1px solid rgba(31,36,48,.10);
+      border-radius: 16px;
+      background: rgba(255,255,255,.7);
+      padding: 10px 12px;
+    }
+    .noteItem .d{
+      font-size: 11px;
+      font-weight: 900;
+      color: rgba(31,36,48,.75);
+      display:flex;
+      align-items:center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .noteItem .t{
+      margin-top: 6px;
+      white-space: pre-wrap;
+      font-size: 13px;
+      color: rgba(31,36,48,.92);
+    }
+    .soft{
+      opacity: .75;
+      font-weight: 800;
+      font-size: 12px;
+    }
+
+    .scrollBox{
+      max-height: 420px;
+      overflow: auto;
+      border-radius: 18px;
+      border: 1px solid rgba(31,36,48,.10);
+      background: rgba(255,255,255,.55);
+    }
+    .scrollBox > table{ border: none; border-radius: 0; background: transparent; }
   </style>
 </head>
 
@@ -272,7 +303,7 @@
       <header>
         <div>
           <h1>Kitten Growth Tracker <span aria-hidden>🐾</span></h1>
-          <div class="sub">GitHub Pages • multiple charts • adopter tracking • live litter age • Google Sheet backend sync</div>
+          <div class="sub">Track weigh-ins, notes, and adopter info in one place.</div>
         </div>
 
         <div class="row">
@@ -283,17 +314,11 @@
             🎂 Born: <span id="bornDate">—</span>
           </span>
 
-          <span class="pill" id="cloudPill" data-cloud="idle" title="Cloud sync status">
-            <span id="cloudText">☁️ Cloud • idle</span>
+          <span class="pill" id="statusPill" data-status="idle" title="Save status">
+            <span id="statusText">✅ Saved</span>
           </span>
-          <button class="btn primary" id="syncNowBtn" title="Force save to the cloud now">☁️ Sync now</button>
 
-          <button class="btn" id="exportBtn" title="Download your data as JSON">⬇️ Export</button>
-          <label class="btn" title="Import a previously exported JSON">
-            ⬆️ Import
-            <input class="fileInput" id="importFile" type="file" accept="application/json" />
-          </label>
-          <button class="btn pink" id="resetBtn" title="Reset back to the original starting data">🧼 Reset</button>
+          <button class="btn primary" id="adminBtn" title="Unlock editing">🔒 Admin</button>
         </div>
       </header>
 
@@ -301,8 +326,8 @@
         <div class="card">
           <div class="head">
             <div>
-              <h2>Charts (pick a tab!)</h2>
-              <div class="small">Hover for details • toggle “All kittens” vs selected • units anytime</div>
+              <h2>Charts</h2>
+              <div class="small">Hover for details • toggle “All kittens” vs selected • switch units anytime</div>
             </div>
             <div class="controls">
               <label style="width:140px;">
@@ -315,19 +340,17 @@
               <label style="display:flex;align-items:center;gap:8px;width:auto;font-weight:900;">
                 <input id="allToggle" type="checkbox" checked> All kittens
               </label>
-              <label style="display:flex;align-items:center;gap:8px;width:auto;font-weight:900;">
-                <input id="normalizeToggle" type="checkbox"> Normalize
-              </label>
             </div>
           </div>
 
           <div class="body">
             <div class="tabs">
-              <div class="tabbar" role="tablist" aria-label="Chart tabs">
+              <div class="tabbar" role="tablist" aria-label="Tabs">
                 <button class="tabbtn active" data-tab="growth" role="tab">📈 Growth</button>
-                <button class="tabbtn" data-tab="gain" role="tab">⚡ Daily gain</button>
-                <button class="tabbtn" data-tab="avg" role="tab">✨ Litter avg</button>
                 <button class="tabbtn" data-tab="latest" role="tab">🏆 Latest weights</button>
+                <button class="tabbtn" data-tab="avg" role="tab">✨ Litter avg</button>
+                <button class="tabbtn" data-tab="pie" role="tab">🥧 Pie</button>
+                <button class="tabbtn" data-tab="table" role="tab">📋 Table</button>
               </div>
               <div class="miniActions">
                 <button class="btn primary" id="addWeighBtn" title="Add a weigh-in for the selected kitten">➕ Add weigh-in</button>
@@ -335,12 +358,14 @@
             </div>
 
             <div class="charts">
-              <div class="hint" id="chartHint">Tip: Turn on Normalize to compare curves (change since first weigh-in).</div>
-
               <div class="chartWrap" id="wrap-growth"><canvas id="chartGrowth"></canvas></div>
-              <div class="chartWrap" id="wrap-gain" style="display:none;"><canvas id="chartGain"></canvas></div>
-              <div class="chartWrap short" id="wrap-avg" style="display:none;"><canvas id="chartAvg"></canvas></div>
               <div class="chartWrap short" id="wrap-latest" style="display:none;"><canvas id="chartLatest"></canvas></div>
+              <div class="chartWrap short" id="wrap-avg" style="display:none;"><canvas id="chartAvg"></canvas></div>
+              <div class="chartWrap short" id="wrap-pie" style="display:none;"><canvas id="chartPie"></canvas></div>
+              <div id="wrap-table" style="display:none;">
+                <div class="scrollBox" id="weightsTableWrap"></div>
+                <div class="small" style="margin-top: 8px;">Tip: rows are dates • columns are kittens • blanks mean no weigh-in for that date.</div>
+              </div>
             </div>
           </div>
         </div>
@@ -349,7 +374,7 @@
           <div class="head">
             <div>
               <h2>Roster</h2>
-              <div class="small">6 kittens • tap one to edit adopter + weigh-ins</div>
+              <div class="small">6 kittens • tap one to view</div>
             </div>
             <label style="width:190px;">
               Search
@@ -370,17 +395,19 @@
               </div>
               <div class="row">
                 <span class="pill" title="Currently selected kitten">🐾 <span id="selectedNamePill">—</span></span>
+                <span class="pill" id="adminPill" data-status="idle" title="Editing is locked/unlocked">
+                  <span id="adminText">🔒 Locked</span>
+                </span>
               </div>
             </div>
           </div>
           <div class="body" id="selectedPanel"></div>
         </div>
       </div>
-
-      <div class="footer">Made for cozy kitten season. Export JSON occasionally as a backup. 💖</div>
     </div>
   </div>
 
+  <!-- Add weigh-in -->
   <dialog id="weighDialog" style="border:none;border-radius:22px;padding:0;width:min(520px,92vw);box-shadow:0 10px 30px rgba(31,36,48,.08);">
     <form method="dialog" style="padding:14px;background:rgba(255,255,255,.96);border:1px solid rgba(31,36,48,.14);border-radius:22px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
@@ -399,11 +426,32 @@
         </div>
       </div>
 
-      <div class="hint" style="margin-top:10px;">If you already weighed on that date, this will update it.</div>
+      <div class="small" style="margin-top:10px;">If you already weighed on that date, this will update it.</div>
 
       <div style="margin-top:10px;display:flex;gap:10px;justify-content:flex-end;">
         <button class="btn" value="cancel">Cancel</button>
         <button class="btn pink" id="weighSave" value="default">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Admin unlock -->
+  <dialog id="adminDialog" style="border:none;border-radius:22px;padding:0;width:min(520px,92vw);box-shadow:0 10px 30px rgba(31,36,48,.08);">
+    <form method="dialog" style="padding:14px;background:rgba(255,255,255,.96);border:1px solid rgba(31,36,48,.14);border-radius:22px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="font-family:Fredoka, Nunito;font-size:16px;font-weight:600;">Admin</div>
+        <button class="btn" value="cancel" aria-label="Close">✖</button>
+      </div>
+
+      <div style="margin-top:10px;">
+        <label>Enter admin code</label>
+        <input id="adminCodeInput" type="password" placeholder="••••••" />
+        <div class="small" style="margin-top:6px;">Unlocks editing (profile, adopter info, notes, weigh-ins).</div>
+      </div>
+
+      <div style="margin-top:10px;display:flex;gap:10px;justify-content:flex-end;">
+        <button class="btn" value="cancel">Cancel</button>
+        <button class="btn pink" id="adminUnlockBtn" value="default">Unlock</button>
       </div>
     </form>
   </dialog>
@@ -413,22 +461,52 @@
      * CONFIG
      ***********************/
     const BACKEND_URL = "https://script.google.com/macros/s/AKfycbwNFeBLgAJFaE3XLbQ5ijQAo4EYC4rvdWuQ2aoYy8tQng4a0_MbhIm331MPXLAaaEDPSw/exec";
-    const STORAGE_KEY = "kitten-growth-tracker:github-pages:backend:v1";
+    const STORAGE_KEY = "kitten-growth-tracker:v2";
     const LITTER_BIRTHDATE_ISO = "2025-12-30";
 
+    // Admin code (as requested)
+    const ADMIN_CODE = "McRae";
+
     /***********************
-     * SEED DATA (starting point)
+     * SEED DATA
+     * Notes + adopterNotes are now dated entries:
+     *   notesEntries: [{dateISO, text}]
+     *   adopterNotesEntries: [{dateISO, text}]
      ***********************/
     const SEED = {
       unit: "oz",
       litterBirthDateISO: LITTER_BIRTHDATE_ISO,
       kittens: [
-        { id:"orange", name:"Orange", emoji:"🐱", tag:"Orange", description:"", status:"Available", adopter:{name:"",email:"",phone:"",notes:""}, notes:"", milestones:[], weighIns:[{date:"2026-01-01",oz:4.88},{date:"2026-01-03",oz:6.03},{date:"2026-01-05",oz:7.13}] },
-        { id:"blackie", name:"Blackie", emoji:"🐈‍⬛", tag:"Black", description:"", status:"Available", adopter:{name:"",email:"",phone:"",notes:""}, notes:"", milestones:[], weighIns:[{date:"2026-01-01",oz:3.877},{date:"2026-01-03",oz:5.407},{date:"2026-01-05",oz:6.63}] },
-        { id:"tux", name:"Tux", emoji:"🎩", tag:"Tux", description:"", status:"Available", adopter:{name:"",email:"",phone:"",notes:""}, notes:"", milestones:[], weighIns:[{date:"2026-01-01",oz:5.255},{date:"2026-01-03",oz:6.49},{date:"2026-01-05",oz:7.5}] },
-        { id:"tux2", name:"Tux 2", emoji:"🧦", tag:"Tux", description:"White stripe on left leg", status:"Available", adopter:{name:"",email:"",phone:"",notes:""}, notes:"", milestones:[], weighIns:[{date:"2026-01-01",oz:5.04},{date:"2026-01-03",oz:6.48},{date:"2026-01-05",oz:7.17}] },
-        { id:"tortie", name:"Tortie", emoji:"🍂", tag:"Tortie", description:"", status:"Available", adopter:{name:"",email:"",phone:"",notes:""}, notes:"", milestones:[], weighIns:[{date:"2026-01-01",oz:4.38},{date:"2026-01-03",oz:5.65},{date:"2026-01-05",oz:7.0}] },
-        { id:"calico", name:"Calico", emoji:"🌸", tag:"Calico", description:"", status:"Available", adopter:{name:"",email:"",phone:"",notes:""}, notes:"", milestones:[], weighIns:[{date:"2026-01-01",oz:4.504},{date:"2026-01-03",oz:6.1},{date:"2026-01-05",oz:7.06}] },
+        { id:"orange", name:"Orange", emoji:"🐱", tag:"Orange", description:"", status:"Available",
+          adopter:{name:"",email:"",phone:""},
+          adopterNotesEntries: [],
+          notesEntries: [],
+          weighIns:[{date:"2026-01-01",oz:4.88},{date:"2026-01-03",oz:6.03},{date:"2026-01-05",oz:7.13}] },
+        { id:"blackie", name:"Blackie", emoji:"🐈‍⬛", tag:"Black", description:"", status:"Available",
+          adopter:{name:"",email:"",phone:""},
+          adopterNotesEntries: [],
+          notesEntries: [],
+          weighIns:[{date:"2026-01-01",oz:3.877},{date:"2026-01-03",oz:5.407},{date:"2026-01-05",oz:6.63}] },
+        { id:"tux", name:"Tux", emoji:"🎩", tag:"Tux", description:"", status:"Available",
+          adopter:{name:"",email:"",phone:""},
+          adopterNotesEntries: [],
+          notesEntries: [],
+          weighIns:[{date:"2026-01-01",oz:5.255},{date:"2026-01-03",oz:6.49},{date:"2026-01-05",oz:7.5}] },
+        { id:"tux2", name:"Tux 2", emoji:"🧦", tag:"Tux", description:"White stripe on left leg", status:"Available",
+          adopter:{name:"",email:"",phone:""},
+          adopterNotesEntries: [],
+          notesEntries: [],
+          weighIns:[{date:"2026-01-01",oz:5.04},{date:"2026-01-03",oz:6.48},{date:"2026-01-05",oz:7.17}] },
+        { id:"tortie", name:"Tortie", emoji:"🍂", tag:"Tortie", description:"", status:"Available",
+          adopter:{name:"",email:"",phone:""},
+          adopterNotesEntries: [],
+          notesEntries: [],
+          weighIns:[{date:"2026-01-01",oz:4.38},{date:"2026-01-03",oz:5.65},{date:"2026-01-05",oz:7.0}] },
+        { id:"calico", name:"Calico", emoji:"🌸", tag:"Calico", description:"", status:"Available",
+          adopter:{name:"",email:"",phone:""},
+          adopterNotesEntries: [],
+          notesEntries: [],
+          weighIns:[{date:"2026-01-01",oz:4.504},{date:"2026-01-03",oz:6.1},{date:"2026-01-05",oz:7.06}] },
       ]
     };
 
@@ -437,6 +515,25 @@
      ***********************/
     const deepClone = (x) => JSON.parse(JSON.stringify(x));
     const sortWeighIns = (ws) => [...ws].sort((a,b) => String(a.date).localeCompare(String(b.date)));
+    const sortEntriesDesc = (arr) => [...(arr||[])].sort((a,b) => String(b.dateISO).localeCompare(String(a.dateISO)));
+
+    const todayISO = () => new Date().toISOString().slice(0,10);
+
+    const normalizeLegacyNotes = (k) => {
+      // Convert old "notes" string into notesEntries once
+      if (typeof k.notes === "string" && k.notes.trim()) {
+        k.notesEntries = k.notesEntries || [];
+        k.notesEntries.unshift({ dateISO: todayISO(), text: k.notes.trim() });
+      }
+      delete k.notes;
+
+      if (k.adopter && typeof k.adopter.notes === "string" && k.adopter.notes.trim()) {
+        k.adopterNotesEntries = k.adopterNotesEntries || [];
+        k.adopterNotesEntries.unshift({ dateISO: todayISO(), text: k.adopter.notes.trim() });
+      }
+      if (k.adopter) delete k.adopter.notes;
+      return k;
+    };
 
     const mergeIntoSeed = (incoming) => {
       const merged = deepClone(SEED);
@@ -449,14 +546,21 @@
       merged.kittens = merged.kittens.map(k => {
         const inc = byId.get(k.id);
         if (!inc) return k;
-        return {
+
+        const next = {
           ...k,
           ...inc,
           id: k.id,
           adopter: { ...k.adopter, ...(inc.adopter || {}) },
           weighIns: sortWeighIns(Array.isArray(inc.weighIns) ? inc.weighIns : k.weighIns),
-          milestones: Array.isArray(inc.milestones) ? inc.milestones : (k.milestones || [])
+          notesEntries: Array.isArray(inc.notesEntries) ? inc.notesEntries : (k.notesEntries || []),
+          adopterNotesEntries: Array.isArray(inc.adopterNotesEntries) ? inc.adopterNotesEntries : (k.adopterNotesEntries || []),
         };
+
+        // backward compatibility for older saved data
+        normalizeLegacyNotes(next);
+
+        return next;
       });
 
       return merged;
@@ -514,7 +618,9 @@
     };
 
     const ensureAdopter = (k) => {
-      if (!k.adopter) k.adopter = { name:"", email:"", phone:"", notes:"" };
+      if (!k.adopter) k.adopter = { name:"", email:"", phone:"" };
+      if (!Array.isArray(k.notesEntries)) k.notesEntries = [];
+      if (!Array.isArray(k.adopterNotesEntries)) k.adopterNotesEntries = [];
       return k;
     };
 
@@ -548,41 +654,40 @@
       return `<span class="badge ${cls}">${escapeHtml(s)}</span>`;
     };
 
+    const canEdit = () => isAdmin === true;
+
     /***********************
-     * CLOUD SYNC
+     * SAVE STATUS + API SYNC
      ***********************/
-    let cloudStatus = "idle"; // idle|loading|synced|dirty|saving|error
-    let cloudMessage = "";
-    let lastCloudUpdatedAt = null;
-    let lastSeenUpdatedAt = null;
+    let saveStatus = "idle"; // idle|loading|synced|dirty|saving|error
+    let saveMsg = "";
 
-    const cloudPill = document.getElementById("cloudPill");
-    const cloudText = document.getElementById("cloudText");
-    const syncNowBtn = document.getElementById("syncNowBtn");
+    const statusPill = document.getElementById("statusPill");
+    const statusText = document.getElementById("statusText");
 
-    const setCloud = (s, msg="") => {
-      cloudStatus = s;
-      cloudMessage = msg;
-      renderCloudPill();
+    const setStatus = (s, msg="") => {
+      saveStatus = s;
+      saveMsg = msg;
+      renderStatus();
     };
 
-    const renderCloudPill = () => {
+    const renderStatus = () => {
       const emoji =
-        cloudStatus === "loading" ? "☁️" :
-        cloudStatus === "saving"  ? "💾" :
-        cloudStatus === "synced"  ? "✅" :
-        cloudStatus === "dirty"   ? "🟡" :
-        cloudStatus === "error"   ? "⚠️" : "☁️";
+        saveStatus === "loading" ? "☁️" :
+        saveStatus === "saving"  ? "💾" :
+        saveStatus === "synced"  ? "✅" :
+        saveStatus === "dirty"   ? "🟡" :
+        saveStatus === "error"   ? "⚠️" : "✅";
 
       const label =
-        cloudStatus === "loading" ? "Loading…" :
-        cloudStatus === "saving"  ? "Saving…" :
-        cloudStatus === "synced"  ? "Synced" :
-        cloudStatus === "dirty"   ? "Unsynced" :
-        cloudStatus === "error"   ? "Error" : "Cloud";
+        saveStatus === "loading" ? "Loading…" :
+        saveStatus === "saving"  ? "Saving…" :
+        saveStatus === "synced"  ? "Saved" :
+        saveStatus === "dirty"   ? "Not saved yet" :
+        saveStatus === "error"   ? "Save error" : "Saved";
 
-      cloudPill.setAttribute("data-cloud", cloudStatus);
-      cloudText.textContent = `${emoji} ${label}${cloudMessage ? " • " + cloudMessage : ""}`;
+      statusPill.setAttribute("data-status", saveStatus);
+      statusText.textContent = `${emoji} ${label}${saveMsg ? " • " + saveMsg : ""}`;
     };
 
     const safeJson = async (res) => {
@@ -591,82 +696,38 @@
       catch { throw new Error("Backend returned non-JSON: " + text.slice(0, 220)); }
     };
 
-    const fetchCloudState = async () => {
+    const fetchRemoteState = async () => {
       const res = await fetch(BACKEND_URL, { method: "GET" });
       if (!res.ok) throw new Error(`GET failed: ${res.status}`);
       const data = await safeJson(res);
-      lastCloudUpdatedAt = data?.updated_at ?? null;
       return data?.state ?? null;
     };
 
-    const pushCloudState = async (nextState) => {
-      // Use text/plain to reduce CORS/preflight headaches with Apps Script
+    const pushRemoteState = async (nextState) => {
       const body = JSON.stringify({ state: nextState });
-
       const res = await fetch(BACKEND_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body
       });
-
       if (!res.ok) throw new Error(`POST failed: ${res.status}`);
-
-      // Some scripts return JSON; if not, ignore.
-      try {
-        const data = await safeJson(res);
-        if (data?.updated_at) lastCloudUpdatedAt = data.updated_at;
-      } catch {}
+      // Some scripts return JSON; ignore if not.
+      try { await safeJson(res); } catch {}
     };
 
     let saveTimer = null;
-    const markDirtyAndScheduleCloudSave = () => {
-      setCloud("dirty", "Not synced yet");
+    const markDirtyAndScheduleSave = () => {
+      setStatus("dirty");
       if (saveTimer) clearTimeout(saveTimer);
       saveTimer = setTimeout(async () => {
         try {
-          setCloud("saving", "Saving…");
-          await pushCloudState(state);
-          setCloud("synced", "Saved to cloud");
-          lastSeenUpdatedAt = lastCloudUpdatedAt;
+          setStatus("saving");
+          await pushRemoteState(state);
+          setStatus("synced");
         } catch (e) {
-          setCloud("error", e.message || "Save failed");
+          setStatus("error", e.message || "Save failed");
         }
-      }, 700);
-    };
-
-    const manualSyncNow = async () => {
-      try {
-        setCloud("saving", "Saving…");
-        await pushCloudState(state);
-        setCloud("synced", "Saved to cloud");
-        lastSeenUpdatedAt = lastCloudUpdatedAt;
-      } catch (e) {
-        setCloud("error", e.message || "Save failed");
-      }
-    };
-
-    // Conservative polling: if cloud changes AND we are synced, adopt remote.
-    const CLOUD_POLL_MS = 8000;
-    const pollCloud = async () => {
-      try {
-        const remote = await fetchCloudState();
-        if (!remote) return;
-
-        if (lastCloudUpdatedAt && lastSeenUpdatedAt && lastCloudUpdatedAt !== lastSeenUpdatedAt) {
-          if (cloudStatus === "dirty" || cloudStatus === "saving") return; // don't overwrite local edits
-          state = mergeIntoSeed(remote);
-          saveLocal();
-          if (!state.kittens.some(k => k.id === selectedId)) selectedId = state.kittens[0]?.id || "orange";
-          renderAll();
-          setCloud("synced", "Updated from cloud");
-          lastSeenUpdatedAt = lastCloudUpdatedAt;
-        } else {
-          // set baseline if not set yet
-          if (!lastSeenUpdatedAt && lastCloudUpdatedAt) lastSeenUpdatedAt = lastCloudUpdatedAt;
-        }
-      } catch {
-        // silent during polling
-      }
+      }, 650);
     };
 
     /***********************
@@ -677,16 +738,14 @@
 
     const unitSelect = document.getElementById("unitSelect");
     const allToggle = document.getElementById("allToggle");
-    const normalizeToggle = document.getElementById("normalizeToggle");
     const kittensList = document.getElementById("kittensList");
     const searchInput = document.getElementById("searchInput");
     const selectedPanel = document.getElementById("selectedPanel");
     const selectedSub = document.getElementById("selectedSub");
     const selectedNamePill = document.getElementById("selectedNamePill");
-    const exportBtn = document.getElementById("exportBtn");
-    const importFile = document.getElementById("importFile");
-    const resetBtn = document.getElementById("resetBtn");
+
     const addWeighBtn = document.getElementById("addWeighBtn");
+    const weightsTableWrap = document.getElementById("weightsTableWrap");
 
     const weighDialog = document.getElementById("weighDialog");
     const weighDate = document.getElementById("weighDate");
@@ -696,10 +755,19 @@
     const tabButtons = Array.from(document.querySelectorAll(".tabbtn"));
     const wraps = {
       growth: document.getElementById("wrap-growth"),
-      gain: document.getElementById("wrap-gain"),
-      avg: document.getElementById("wrap-avg"),
       latest: document.getElementById("wrap-latest"),
+      avg: document.getElementById("wrap-avg"),
+      pie: document.getElementById("wrap-pie"),
+      table: document.getElementById("wrap-table"),
     };
+
+    // Admin UI
+    const adminBtn = document.getElementById("adminBtn");
+    const adminDialog = document.getElementById("adminDialog");
+    const adminCodeInput = document.getElementById("adminCodeInput");
+    const adminUnlockBtn = document.getElementById("adminUnlockBtn");
+    const adminPill = document.getElementById("adminPill");
+    const adminText = document.getElementById("adminText");
 
     /***********************
      * CHARTS
@@ -713,7 +781,7 @@
       calico: "#db2777",
     };
 
-    let chartGrowth, chartGain, chartAvg, chartLatest;
+    let chartGrowth, chartAvg, chartLatest, chartPie;
 
     const getVisibleKittens = () => {
       const all = allToggle.checked;
@@ -727,19 +795,16 @@
         return `${d} (day ${ageDays})`;
       });
 
-      const normalize = normalizeToggle.checked;
       const datasets = getVisibleKittens().map(k => {
         const map = new Map((k.weighIns||[]).map(w => [w.date, w]));
         const vals = dates.map(d => {
           const w = map.get(d);
           return w ? getVal(w) : null;
         });
-        const first = vals.find(v => v != null);
-        const y = normalize && first != null ? vals.map(v => v == null ? null : v - first) : vals;
 
         return {
           label: `${k.emoji || "🐾"} ${k.name}`,
-          data: y,
+          data: vals,
           borderColor: palette[k.id] || "#111827",
           backgroundColor: palette[k.id] || "#111827",
           borderWidth: k.id === selectedId ? 3 : 2,
@@ -750,52 +815,7 @@
         };
       });
 
-      const yLabel = normalize ? `Δ weight (${state.unit})` : `Weight (${state.unit})`;
-      return { labels, datasets, yLabel };
-    };
-
-    const buildGainData = () => {
-      const dates = allDates();
-      const labels = dates.map(d => {
-        const ageDays = Math.max(0, dayDiffISO(state.litterBirthDateISO, d));
-        return `${d} (day ${ageDays})`;
-      });
-
-      const datasets = getVisibleKittens().map(k => {
-        const s = sortWeighIns(k.weighIns || []);
-        const byDate = new Map(s.map(w => [w.date, w]));
-
-        let prevDate = null;
-        let prevOz = null;
-
-        const data = dates.map(d => {
-          const w = byDate.get(d);
-          if (!w) return null;
-          if (prevDate == null || prevOz == null) {
-            prevDate = d;
-            prevOz = w.oz;
-            return null;
-          }
-          const days = Math.max(1, dayDiffISO(prevDate, d));
-          const perDayOz = (w.oz - prevOz) / days;
-          prevDate = d;
-          prevOz = w.oz;
-          return state.unit === "g" ? ozToG(perDayOz) : perDayOz;
-        });
-
-        return {
-          label: `${k.emoji || "🐾"} ${k.name}`,
-          data,
-          borderColor: palette[k.id] || "#111827",
-          backgroundColor: palette[k.id] || "#111827",
-          borderWidth: k.id === selectedId ? 3 : 2,
-          pointRadius: 0,
-          tension: 0.25,
-          spanGaps: true
-        };
-      });
-
-      return { labels, datasets, yLabel: `${state.unit}/day` };
+      return { labels, datasets, yLabel: `Weight (${state.unit})` };
     };
 
     const buildAvgData = () => {
@@ -834,7 +854,7 @@
       const rows = state.kittens
         .map(k => {
           const last = latestWeighIn(k);
-          return { name: `${k.emoji || "🐾"} ${k.name}`, value: last ? getVal(last) : null };
+          return { id: k.id, name: `${k.emoji || "🐾"} ${k.name}`, value: last ? getVal(last) : null };
         })
         .sort((a,b) => (b.value ?? -Infinity) - (a.value ?? -Infinity));
 
@@ -852,7 +872,30 @@
       };
     };
 
-    const makeChart = (canvas, type, dataBuilder) => {
+    const buildPieData = () => {
+      // Pie chart: share of latest weights (all kittens or selected)
+      const ks = getVisibleKittens();
+      const rows = ks.map(k => {
+        const last = latestWeighIn(k);
+        return { name: `${k.emoji || "🐾"} ${k.name}`, value: last ? getVal(last) : 0 };
+      }).filter(r => (r.value ?? 0) > 0);
+
+      const colors = rows.map(r => {
+        const id = state.kittens.find(k => `${k.emoji || "🐾"} ${k.name}` === r.name)?.id;
+        return palette[id] || "#111827";
+      });
+
+      return {
+        labels: rows.map(r => r.name),
+        datasets: [{
+          label: `Share of latest weights`,
+          data: rows.map(r => r.value),
+          backgroundColor: colors
+        }],
+      };
+    };
+
+    const makeChart = (canvas, type, dataBuilder, yLabelOpt=null) => {
       const built = dataBuilder();
       return new Chart(canvas, {
         type,
@@ -868,15 +911,20 @@
                   const v = item.raw;
                   if (v == null) return `${item.dataset.label}: —`;
                   const digits = state.unit === "g" ? 1 : 3;
-                  const suffix = built.yLabel.includes("/day") ? `${state.unit}/day` : state.unit;
-                  return `${item.dataset.label}: ${fmt(v, digits)} ${suffix}`;
+                  if (type === "pie") {
+                    const total = item.dataset.data.reduce((a,b) => a + (Number(b)||0), 0) || 1;
+                    const pct = (Number(v) / total) * 100;
+                    return `${item.label}: ${fmt(v, digits)} ${state.unit} (${fmt(pct, 1)}%)`;
+                  }
+                  const suffix = yLabelOpt ? "" : state.unit;
+                  return `${item.dataset.label}: ${fmt(v, digits)} ${suffix}`.trim();
                 }
               }
             }
           },
-          scales: {
+          scales: (type === "pie") ? {} : {
             x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }, grid: { color: "rgba(31,36,48,.06)" } },
-            y: { title: { display: true, text: built.yLabel, font: { family: "Nunito", weight: "700" } }, grid: { color: "rgba(31,36,48,.06)" } }
+            y: { title: { display: true, text: yLabelOpt || built.yLabel || "", font: { family: "Nunito", weight: "700" } }, grid: { color: "rgba(31,36,48,.06)" } }
           }
         }
       });
@@ -884,14 +932,51 @@
 
     const rebuildCharts = () => {
       chartGrowth?.destroy();
-      chartGain?.destroy();
       chartAvg?.destroy();
       chartLatest?.destroy();
+      chartPie?.destroy();
 
       chartGrowth = makeChart(document.getElementById("chartGrowth"), "line", buildGrowthData);
-      chartGain = makeChart(document.getElementById("chartGain"), "line", buildGainData);
-      chartAvg = makeChart(document.getElementById("chartAvg"), "line", buildAvgData);
       chartLatest = makeChart(document.getElementById("chartLatest"), "bar", buildLatestData);
+      chartAvg = makeChart(document.getElementById("chartAvg"), "line", buildAvgData);
+      chartPie = makeChart(document.getElementById("chartPie"), "pie", buildPieData, null);
+
+      renderWeightsTable();
+    };
+
+    /***********************
+     * TABLE VIEW (all weights by date)
+     ***********************/
+    const renderWeightsTable = () => {
+      const dates = allDates();
+      const kittens = state.kittens;
+
+      const digits = state.unit === "g" ? 1 : 3;
+
+      const header = `
+        <table>
+          <thead>
+            <tr>
+              <th style="min-width: 140px;">Date</th>
+              <th style="min-width: 110px;">Age (days)</th>
+              ${kittens.map(k => `<th style="min-width: 140px;">${escapeHtml((k.emoji||"🐾") + " " + k.name)}</th>`).join("")}
+            </tr>
+          </thead>
+          <tbody>
+            ${dates.map(d => {
+              const age = Math.max(0, dayDiffISO(state.litterBirthDateISO, d));
+              const cells = kittens.map(k => {
+                const w = (k.weighIns||[]).find(x => x.date === d);
+                const v = w ? getVal(w) : null;
+                return `<td>${v == null ? "" : `${fmt(v, digits)} ${state.unit}`}</td>`;
+              }).join("");
+              return `<tr><td>${escapeHtml(d)}</td><td>${age}</td>${cells}</tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      `;
+
+      weightsTableWrap.innerHTML = header;
     };
 
     /***********************
@@ -929,7 +1014,7 @@
               <div>${statusBadge(k.status)}</div>
               <div class="kmeta" style="margin-top:4px;">
                 ${last ? `${fmt(lastV, digits)} ${state.unit}` : "—"}
-                ${deltaText ? `<span class="kmeta"> • ${deltaText}</span>` : ""}
+                ${deltaText ? `<span class="kmeta"> • ${escapeHtml(deltaText)}</span>` : ""}
               </div>
             </div>
           </div>
@@ -942,6 +1027,25 @@
           renderAll();
         });
       });
+    };
+
+    const renderNoteList = (entries, kind, allowDelete) => {
+      const list = sortEntriesDesc(entries || []);
+      if (!list.length) return `<div class="small">No saved ${kind} yet.</div>`;
+
+      return `
+        <div class="noteList">
+          ${list.map((e, idx) => `
+            <div class="noteItem">
+              <div class="d">
+                <div>${escapeHtml(e.dateISO || "—")}</div>
+                ${allowDelete ? `<button class="btn" data-del-note="${escapeHtml(kind)}:${idx}" title="Delete">🗑️</button>` : `<span class="soft">saved</span>`}
+              </div>
+              <div class="t">${escapeHtml(e.text || "")}</div>
+            </div>
+          `).join("")}
+        </div>
+      `;
     };
 
     const renderSelected = () => {
@@ -964,6 +1068,7 @@
       const deltaPerDay = (delta != null && daysBetween != null) ? (delta / daysBetween) : null;
 
       const adopterEnabled = (k.status === "Reserved" || k.status === "Adopted");
+      const editing = canEdit();
 
       const weighRows = sortWeighIns(k.weighIns || []).map(w => {
         const v = getVal(w);
@@ -973,7 +1078,9 @@
             <td>${escapeHtml(w.date)}</td>
             <td>${ad}</td>
             <td>${fmt(v, digits)} ${state.unit}</td>
-            <td style="text-align:right;"><button class="btn" data-del="${escapeHtml(w.date)}" title="Delete weigh-in">🗑️</button></td>
+            <td style="text-align:right;">
+              <button class="btn" data-del="${escapeHtml(w.date)}" title="Delete weigh-in" ${editing ? "" : "disabled"}>🗑️</button>
+            </td>
           </tr>
         `;
       }).join("");
@@ -1002,20 +1109,25 @@
 
         <div class="two" style="margin-top: 14px;">
           <div class="card" style="box-shadow:none; background: rgba(255,255,255,.55);">
-            <div class="head" style="border-bottom:none;"><div><h2>Profile</h2><div class="small">Name / emoji / status</div></div></div>
+            <div class="head" style="border-bottom:none;">
+              <div>
+                <h2>Profile</h2>
+                <div class="small">${editing ? "Editing enabled" : "Locked (admin only)"}</div>
+              </div>
+            </div>
             <div class="body">
               <div class="two">
                 <div>
                   <label>Name</label>
-                  <input id="k_name" value="${escapeHtml(k.name)}" />
+                  <input id="k_name" value="${escapeHtml(k.name)}" ${editing ? "" : "disabled"} />
                 </div>
                 <div>
                   <label>Emoji</label>
-                  <input id="k_emoji" value="${escapeHtml(k.emoji || "")}" placeholder="🐱" />
+                  <input id="k_emoji" value="${escapeHtml(k.emoji || "")}" placeholder="🐱" ${editing ? "" : "disabled"} />
                 </div>
                 <div>
                   <label>Status</label>
-                  <select id="k_status">
+                  <select id="k_status" ${editing ? "" : "disabled"}>
                     <option value="Available" ${k.status === "Available" ? "selected" : ""}>Available</option>
                     <option value="Reserved" ${k.status === "Reserved" ? "selected" : ""}>Reserved</option>
                     <option value="Adopted" ${k.status === "Adopted" ? "selected" : ""}>Adopted</option>
@@ -1023,43 +1135,53 @@
                 </div>
                 <div>
                   <label>Tag</label>
-                  <input id="k_tag" value="${escapeHtml(k.tag || "")}" placeholder="Calico / Tux / Orange…" />
+                  <input id="k_tag" value="${escapeHtml(k.tag || "")}" placeholder="Calico / Tux / Orange…" ${editing ? "" : "disabled"} />
                 </div>
               </div>
               <div style="margin-top: 10px;">
                 <label>Description</label>
-                <textarea id="k_desc" placeholder="White stripe on left leg…">${escapeHtml(k.description || "")}</textarea>
+                <textarea id="k_desc" placeholder="White stripe on left leg…" ${editing ? "" : "disabled"}>${escapeHtml(k.description || "")}</textarea>
               </div>
               <div style="margin-top: 10px; display:flex; justify-content:flex-end;">
-                <button class="btn pink" id="saveProfileBtn">💾 Save profile</button>
+                <button class="btn pink" id="saveProfileBtn" ${editing ? "" : "disabled"}>💾 Save profile</button>
               </div>
             </div>
           </div>
 
           <div class="card" style="box-shadow:none; background: rgba(255,255,255,.55);">
-            <div class="head" style="border-bottom:none;"><div><h2>Adopter</h2><div class="small">Enable by setting status to Reserved or Adopted</div></div></div>
+            <div class="head" style="border-bottom:none;">
+              <div>
+                <h2>Adopter</h2>
+                <div class="small">${adopterEnabled ? "Enabled (Reserved/Adopted)" : "Set status to Reserved/Adopted to enable"}</div>
+              </div>
+            </div>
             <div class="body">
-              <div class="hint">Adopter fields are ${adopterEnabled ? "enabled ✅" : "disabled until Reserved/Adopted 💤"}.</div>
-              <div class="two" style="margin-top: 10px;">
+              <div class="two">
                 <div>
                   <label>Adopter name</label>
-                  <input id="a_name" value="${escapeHtml(k.adopter.name || "")}" ${adopterEnabled ? "" : "disabled"} />
+                  <input id="a_name" value="${escapeHtml(k.adopter.name || "")}" ${(editing && adopterEnabled) ? "" : "disabled"} />
                 </div>
                 <div>
                   <label>Email</label>
-                  <input id="a_email" value="${escapeHtml(k.adopter.email || "")}" ${adopterEnabled ? "" : "disabled"} />
+                  <input id="a_email" value="${escapeHtml(k.adopter.email || "")}" ${(editing && adopterEnabled) ? "" : "disabled"} />
                 </div>
                 <div>
                   <label>Phone</label>
-                  <input id="a_phone" value="${escapeHtml(k.adopter.phone || "")}" ${adopterEnabled ? "" : "disabled"} />
-                </div>
-                <div style="grid-column:1/-1;">
-                  <label>Notes</label>
-                  <textarea id="a_notes" ${adopterEnabled ? "" : "disabled"} placeholder="Meetup preferences, home notes, gotcha-day plan…">${escapeHtml(k.adopter.notes || "")}</textarea>
+                  <input id="a_phone" value="${escapeHtml(k.adopter.phone || "")}" ${(editing && adopterEnabled) ? "" : "disabled"} />
                 </div>
               </div>
-              <div style="margin-top: 10px; display:flex; justify-content:flex-end;">
-                <button class="btn pink" id="saveAdopterBtn" ${adopterEnabled ? "" : "disabled"}>💖 Save adopter</button>
+
+              <div style="margin-top: 12px;">
+                <label>Add adopter note</label>
+                <textarea id="a_note_new" placeholder="Meetup preferences, home notes, gotcha-day plan…" ${(editing && adopterEnabled) ? "" : "disabled"}></textarea>
+                <div style="margin-top: 10px; display:flex; justify-content:flex-end;">
+                  <button class="btn pink" id="addAdopterNoteBtn" ${(editing && adopterEnabled) ? "" : "disabled"}>📝 Save adopter note</button>
+                </div>
+                ${renderNoteList(k.adopterNotesEntries, "adopter", editing && adopterEnabled)}
+              </div>
+
+              <div style="margin-top: 12px; display:flex; justify-content:flex-end;">
+                <button class="btn pink" id="saveAdopterBtn" ${(editing && adopterEnabled) ? "" : "disabled"}>💖 Save adopter</button>
               </div>
             </div>
           </div>
@@ -1077,17 +1199,19 @@
                   ${weighRows || '<tr><td colspan="4" class="kmeta">No weigh-ins yet.</td></tr>'}
                 </tbody>
               </table>
-              <div class="small" style="margin-top: 8px;">Tip: Use “Add weigh-in” above the charts.</div>
+              <div class="small" style="margin-top: 8px;">${editing ? "Use “Add weigh-in” above the charts." : "Admin unlock required to add/delete weigh-ins."}</div>
             </div>
           </div>
 
           <div class="card" style="box-shadow:none; background: rgba(255,255,255,.55);">
-            <div class="head" style="border-bottom:none;"><div><h2>Notes</h2><div class="small">Personality, feeding notes, meds, litter training…</div></div></div>
+            <div class="head" style="border-bottom:none;"><div><h2>Notes</h2><div class="small">Saved notes show below by date</div></div></div>
             <div class="body">
-              <textarea id="k_notes" placeholder="Orange is a chaos muffin but purrs like a tractor…">${escapeHtml(k.notes || "")}</textarea>
+              <label>Add note</label>
+              <textarea id="k_note_new" placeholder="Personality, feeding notes, meds, litter training…" ${editing ? "" : "disabled"}></textarea>
               <div style="margin-top: 10px; display:flex; justify-content:flex-end;">
-                <button class="btn pink" id="saveNotesBtn">📝 Save notes</button>
+                <button class="btn pink" id="addNoteBtn" ${editing ? "" : "disabled"}>📝 Save note</button>
               </div>
+              ${renderNoteList(k.notesEntries, "kitten", editing)}
             </div>
           </div>
         </div>
@@ -1096,13 +1220,51 @@
       // Delete weigh-in
       selectedPanel.querySelectorAll("[data-del]").forEach(btn => {
         btn.addEventListener("click", () => {
+          if (!canEdit()) return;
           const date = btn.getAttribute("data-del");
           if (confirm(`Delete weigh-in on ${date} for ${k.name}?`)) {
             k.weighIns = (k.weighIns || []).filter(w => w.date !== date);
             k.weighIns = sortWeighIns(k.weighIns || []);
             saveLocal();
-            markDirtyAndScheduleCloudSave();
+            markDirtyAndScheduleSave();
             renderAll();
+          }
+        });
+      });
+
+      // Delete note/adopter note (index in rendered list, so we re-derive list order)
+      selectedPanel.querySelectorAll("[data-del-note]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          if (!canEdit()) return;
+          const key = btn.getAttribute("data-del-note") || "";
+          const [kind, idxStr] = key.split(":");
+          const idx = Number(idxStr);
+          if (!Number.isFinite(idx)) return;
+
+          if (kind === "kitten") {
+            const ordered = sortEntriesDesc(k.notesEntries);
+            const target = ordered[idx];
+            if (!target) return;
+            if (confirm(`Delete note from ${target.dateISO}?`)) {
+              // remove by identity (date+text match)
+              k.notesEntries = (k.notesEntries||[]).filter(e => !(e.dateISO === target.dateISO && e.text === target.text));
+              saveLocal();
+              markDirtyAndScheduleSave();
+              renderAll(false);
+            }
+          }
+
+          if (kind === "adopter") {
+            if (!(k.status === "Reserved" || k.status === "Adopted")) return;
+            const ordered = sortEntriesDesc(k.adopterNotesEntries);
+            const target = ordered[idx];
+            if (!target) return;
+            if (confirm(`Delete adopter note from ${target.dateISO}?`)) {
+              k.adopterNotesEntries = (k.adopterNotesEntries||[]).filter(e => !(e.dateISO === target.dateISO && e.text === target.text));
+              saveLocal();
+              markDirtyAndScheduleSave();
+              renderAll(false);
+            }
           }
         });
       });
@@ -1117,6 +1279,8 @@
       });
 
       document.getElementById("saveProfileBtn").addEventListener("click", () => {
+        if (!canEdit()) return;
+
         k.name = document.getElementById("k_name").value.trim() || k.name;
         k.emoji = document.getElementById("k_emoji").value.trim() || k.emoji;
         k.status = document.getElementById("k_status").value;
@@ -1125,34 +1289,70 @@
         ensureAdopter(k);
 
         saveLocal();
-        markDirtyAndScheduleCloudSave();
+        markDirtyAndScheduleSave();
         renderAll();
       });
 
       document.getElementById("saveAdopterBtn").addEventListener("click", () => {
+        if (!canEdit()) return;
+        if (!(k.status === "Reserved" || k.status === "Adopted")) return;
+
         ensureAdopter(k);
         k.adopter.name  = document.getElementById("a_name").value;
         k.adopter.email = document.getElementById("a_email").value;
         k.adopter.phone = document.getElementById("a_phone").value;
-        k.adopter.notes = document.getElementById("a_notes").value;
 
         saveLocal();
-        markDirtyAndScheduleCloudSave();
-        renderAll();
-      });
-
-      document.getElementById("saveNotesBtn").addEventListener("click", () => {
-        k.notes = document.getElementById("k_notes").value;
-
-        saveLocal();
-        markDirtyAndScheduleCloudSave();
+        markDirtyAndScheduleSave();
         renderAll(false);
       });
+
+      document.getElementById("addNoteBtn").addEventListener("click", () => {
+        if (!canEdit()) return;
+        const text = document.getElementById("k_note_new").value.trim();
+        if (!text) return;
+
+        k.notesEntries = k.notesEntries || [];
+        k.notesEntries.unshift({ dateISO: todayISO(), text });
+
+        document.getElementById("k_note_new").value = "";
+
+        saveLocal();
+        markDirtyAndScheduleSave();
+        renderAll(false);
+      });
+
+      const addAdopterNoteBtn = document.getElementById("addAdopterNoteBtn");
+      if (addAdopterNoteBtn) {
+        addAdopterNoteBtn.addEventListener("click", () => {
+          if (!canEdit()) return;
+          if (!(k.status === "Reserved" || k.status === "Adopted")) return;
+
+          const text = document.getElementById("a_note_new").value.trim();
+          if (!text) return;
+
+          k.adopterNotesEntries = k.adopterNotesEntries || [];
+          k.adopterNotesEntries.unshift({ dateISO: todayISO(), text });
+
+          document.getElementById("a_note_new").value = "";
+
+          saveLocal();
+          markDirtyAndScheduleSave();
+          renderAll(false);
+        });
+      }
+    };
+
+    const renderAdminUI = () => {
+      adminPill.setAttribute("data-status", isAdmin ? "synced" : "idle");
+      adminText.textContent = isAdmin ? "🔓 Unlocked" : "🔒 Locked";
+      addWeighBtn.disabled = !canEdit();
     };
 
     const renderAll = (rebuild=true) => {
       unitSelect.value = state.unit;
       bornDateEl.textContent = state.litterBirthDateISO;
+      renderAdminUI();
       renderRoster();
       renderSelected();
       if (rebuild) rebuildCharts();
@@ -1164,56 +1364,12 @@
     unitSelect.addEventListener("change", () => {
       state.unit = unitSelect.value;
       saveLocal();
-      markDirtyAndScheduleCloudSave();
+      markDirtyAndScheduleSave();
       renderAll();
     });
+
     allToggle.addEventListener("change", () => rebuildCharts());
-    normalizeToggle.addEventListener("change", () => rebuildCharts());
     searchInput.addEventListener("input", () => renderRoster());
-
-    exportBtn.addEventListener("click", () => {
-      const blob = new Blob([JSON.stringify(state, null, 2)], { type:"application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `kitten-growth-${new Date().toISOString().slice(0,10)}.json`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    });
-
-    importFile.addEventListener("change", () => {
-      const f = importFile.files?.[0];
-      if (!f) return;
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          const incoming = JSON.parse(String(reader.result || ""));
-          state = mergeIntoSeed(incoming);
-          selectedId = state.kittens[0]?.id || selectedId;
-          saveLocal();
-          renderAll();
-
-          // Also push imported data to cloud
-          markDirtyAndScheduleCloudSave();
-        } catch (e) {
-          alert("Could not import JSON: " + e);
-        }
-      };
-      reader.readAsText(f);
-      importFile.value = "";
-    });
-
-    resetBtn.addEventListener("click", () => {
-      if (confirm("Reset back to the original starting data? This overwrites your saved data (and will sync if cloud is enabled).")) {
-        state = deepClone(SEED);
-        selectedId = state.kittens[0]?.id || "orange";
-        saveLocal();
-        markDirtyAndScheduleCloudSave();
-        renderAll();
-      }
-    });
 
     tabButtons.forEach(btn => {
       btn.addEventListener("click", () => {
@@ -1226,6 +1382,10 @@
     });
 
     addWeighBtn.addEventListener("click", () => {
+      if (!canEdit()) {
+        alert("Admin unlock required to add weigh-ins.");
+        return;
+      }
       const k = state.kittens.find(x => x.id === selectedId);
       if (!k) return;
       weighUnit.textContent = state.unit;
@@ -1244,6 +1404,8 @@
 
     document.getElementById("weighSave").addEventListener("click", (ev) => {
       ev.preventDefault();
+      if (!canEdit()) return;
+
       const k = state.kittens.find(x => x.id === selectedId);
       if (!k) return;
 
@@ -1263,13 +1425,31 @@
       k.weighIns = sortWeighIns(k.weighIns || []);
 
       saveLocal();
-      markDirtyAndScheduleCloudSave();
+      markDirtyAndScheduleSave();
 
       weighDialog.close();
       renderAll();
     });
 
-    syncNowBtn.addEventListener("click", manualSyncNow);
+    // Admin unlock
+    let isAdmin = false;
+
+    adminBtn.addEventListener("click", () => {
+      adminCodeInput.value = "";
+      adminDialog.showModal();
+    });
+
+    adminUnlockBtn.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      const code = (adminCodeInput.value || "").trim();
+      if (code === ADMIN_CODE) {
+        isAdmin = true;
+        adminDialog.close();
+        renderAll(false);
+      } else {
+        alert("Incorrect admin code.");
+      }
+    });
 
     /***********************
      * AGE TICKER
@@ -1280,53 +1460,45 @@
     };
 
     /***********************
-     * INIT (load cloud then render)
+     * INIT
      ***********************/
     let state = loadLocal();
     let selectedId = state.kittens[0]?.id || "orange";
 
     const runSelfTests = () => {
       const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
-
       assert(SEED.kittens.length === 6, "Expected 6 kittens in seed data");
       const oz = 10;
       const g = ozToG(oz);
       const oz2 = gToOz(g);
       assert(Math.abs(oz2 - oz) < 1e-9, "Expected gToOz(ozToG(x))≈x");
       assert(dayDiffISO("2026-01-01","2026-01-05") === 4, "Expected 4 day difference");
-
       console.info("Kitten tracker self-tests passed ✅");
     };
 
     const init = async () => {
-      renderCloudPill();
+      renderStatus();
       bornDateEl.textContent = state.litterBirthDateISO;
 
-      // Start ticking immediately (even if cloud load takes time)
       tickAge();
       setInterval(tickAge, 1000);
 
-      // Load from cloud (shared state) if available
+      // Load from API
       try {
-        setCloud("loading", "Fetching shared data…");
-        const remote = await fetchCloudState();
+        setStatus("loading");
+        const remote = await fetchRemoteState();
         if (remote) {
           state = mergeIntoSeed(remote);
           saveLocal();
-          setCloud("synced", "Loaded shared data");
-          lastSeenUpdatedAt = lastCloudUpdatedAt;
-        } else {
-          setCloud("synced", "No cloud state yet (using local)");
         }
+        setStatus("synced");
       } catch (e) {
-        setCloud("error", "Using local (cloud unavailable)");
+        // Keep local if API is unavailable
+        setStatus("error", "Using local");
       }
 
       renderAll();
       runSelfTests();
-
-      // Poll for cloud updates
-      setInterval(pollCloud, CLOUD_POLL_MS);
     };
 
     init();
