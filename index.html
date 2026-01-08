@@ -679,6 +679,13 @@
 
     const nowISO = () => new Date().toISOString();
 
+    // ✅ Drive helpers (FIX)
+    const driveThumbUrl = (fileId, width = 800) =>
+      `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w${width}`;
+
+    const driveViewUrl = (fileId) =>
+      `https://drive.google.com/uc?id=${encodeURIComponent(fileId)}`;
+
     /***********************
      * ADMIN
      ***********************/
@@ -741,7 +748,6 @@
         body
       });
       if (!res.ok) throw new Error(`POST failed: ${res.status}`);
-      // Some scripts return {ok:true}; ignore extra
       await safeJson(res).catch(()=>{});
     };
 
@@ -762,11 +768,6 @@
 
     /***********************
      * DRIVE PHOTO UPLOAD
-     *
-     * IMPORTANT:
-     * This frontend sends NO token.
-     * Your Apps Script must NOT require a token for uploadPhoto.
-     * (Remove the token check there, or it will return Unauthorized.)
      ***********************/
     async function uploadPhotoToDrive({ kittenId, file }) {
       const { base64, mimeType, filename } = await fileToCompressedBase64(file, 1200, 0.82);
@@ -971,7 +972,6 @@
     };
 
     const buildPieData = () => {
-      // Pie = status breakdown (Available/Reserved/Adopted)
       const counts = { Available:0, Reserved:0, Adopted:0 };
       state.kittens.forEach(k => {
         const s = (k.status || "Available");
@@ -984,7 +984,6 @@
         datasets: [{
           label: "Status",
           data: [counts.Available, counts.Reserved, counts.Adopted],
-          // chart.js default colors are fine; keep simple
         }],
         yLabel: ""
       };
@@ -1124,13 +1123,20 @@
       });
     };
 
+    // ✅ FIXED renderGallery: use Drive thumbnail when fileId exists
     const renderGallery = ({ photos, containerEl, titlePrefix, allowDelete, onDelete, onView }) => {
       const items = Array.isArray(photos) ? photos : [];
+
+      const thumbSrcFor = (p) => {
+        if (p?.fileId) return driveThumbUrl(p.fileId, 800);
+        return p?.url || "";
+      };
+
       containerEl.innerHTML = items.map((p, idx) => {
-        const url = escapeHtml(p.url || "");
+        const src = escapeHtml(thumbSrcFor(p));
         return `
           <div class="thumb" data-idx="${idx}" title="Open">
-            <img src="${url}" alt="Photo">
+            <img src="${src}" alt="Photo" loading="lazy" referrerpolicy="no-referrer">
             ${allowDelete ? `<div class="x" data-x="${idx}" title="Remove">✖</div>` : ""}
           </div>
         `;
@@ -1140,7 +1146,7 @@
         const idx = Number(el.getAttribute("data-idx"));
         el.addEventListener("click", (ev) => {
           const x = ev.target?.getAttribute?.("data-x");
-          if (x != null) return; // delete button clicked
+          if (x != null) return;
           const p = items[idx];
           if (!p) return;
           onView(p, idx);
@@ -1357,7 +1363,6 @@
         </div>
       `;
 
-      // Focus controls
       document.getElementById("focusOnlyBtn").addEventListener("click", () => {
         allToggle.checked = false;
         rebuildCharts();
@@ -1367,7 +1372,6 @@
         rebuildCharts();
       });
 
-      // Delete weigh-in
       selectedPanel.querySelectorAll("[data-del]").forEach(btn => {
         btn.addEventListener("click", () => {
           if (!canEdit()) return;
@@ -1382,7 +1386,6 @@
         });
       });
 
-      // Save profile
       document.getElementById("saveProfileBtn").addEventListener("click", () => {
         if (!canEdit()) return;
         k.name = document.getElementById("k_name").value.trim() || k.name;
@@ -1396,7 +1399,6 @@
         renderAll();
       });
 
-      // Save adopter basics (kept minimal: update fields when leaving input via note add, too)
       const writeAdopterBasics = () => {
         ensureKittenShape(k);
         k.adopter.name  = document.getElementById("a_name").value;
@@ -1404,7 +1406,6 @@
         k.adopter.phone = document.getElementById("a_phone").value;
       };
 
-      // Add adopter note (dated)
       document.getElementById("addAdopterNoteBtn").addEventListener("click", () => {
         if (!canEdit() || !adopterEnabled) return;
         writeAdopterBasics();
@@ -1419,7 +1420,6 @@
         renderAll(false);
       });
 
-      // Add kitten note (dated)
       document.getElementById("addKittenNoteBtn").addEventListener("click", () => {
         if (!canEdit()) return;
         const t = (document.getElementById("k_note_new").value || "").trim();
@@ -1433,7 +1433,6 @@
         renderAll(false);
       });
 
-      // Kitten gallery
       const kFile = document.getElementById("k_photoFile");
       const kUpload = document.getElementById("k_uploadPhotoBtn");
       const kGallery = document.getElementById("k_gallery");
@@ -1456,7 +1455,7 @@
         },
         onView: (p) => {
           imgDialogTitle.textContent = `${k.name} • Photo`;
-          imgDialogImg.src = p.url;
+          imgDialogImg.src = p.fileId ? driveViewUrl(p.fileId) : p.url; // ✅ full-size view
           imgDialog.showModal();
         }
       });
@@ -1501,7 +1500,7 @@
         },
         onView: (p) => {
           imgDialogTitle.textContent = `Litter & Mom • Photo`;
-          imgDialogImg.src = p.url;
+          imgDialogImg.src = p.fileId ? driveViewUrl(p.fileId) : p.url; // ✅ full-size view
           imgDialog.showModal();
         }
       });
@@ -1543,7 +1542,6 @@
       });
     });
 
-    // Admin unlock
     adminBtn.addEventListener("click", () => {
       if (isAdmin()) {
         if (confirm("Lock admin mode?")) {
@@ -1562,7 +1560,6 @@
       }
     });
 
-    // Add weigh-in (admin)
     addWeighBtn.addEventListener("click", () => {
       if (!canEdit()) { alert("Admin unlock required."); return; }
       const k = state.kittens.find(x => x.id === selectedId);
@@ -1611,7 +1608,6 @@
       renderAll();
     });
 
-    // Litter & Mom upload
     litterUploadBtn.addEventListener("click", async () => {
       if (!canEdit()) { alert("Admin unlock required."); return; }
       const f = litterPhotoFile.files?.[0];
@@ -1655,7 +1651,6 @@
       tickAge();
       setInterval(tickAge, 1000);
 
-      // Load shared state from backend
       try {
         setStatus("loading", "Loading…");
         const remote = await fetchRemoteState();
