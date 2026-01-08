@@ -1455,7 +1455,8 @@
         },
         onView: (p) => {
           imgDialogTitle.textContent = `${k.name} • Photo`;
-          imgDialogImg.src = p.fileId ? driveViewUrl(p.fileId) : p.url; // ✅ full-size view
+          imgDialogImg.src = p.fileId ? driveThumbUrl(p.fileId, 2000) : p.url;
+ // ✅ full-size view
           imgDialog.showModal();
         }
       });
@@ -1500,7 +1501,8 @@
         },
         onView: (p) => {
           imgDialogTitle.textContent = `Litter & Mom • Photo`;
-          imgDialogImg.src = p.fileId ? driveViewUrl(p.fileId) : p.url; // ✅ full-size view
+          imgDialogImg.src = p.fileId ? driveThumbUrl(p.fileId, 2000) : p.url;
+ // ✅ full-size view
           imgDialog.showModal();
         }
       });
