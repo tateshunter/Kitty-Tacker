@@ -108,7 +108,6 @@
       font-size: 12px;
       color: rgba(31,36,48,.8);
       backdrop-filter: blur(8px);
-      white-space: nowrap;
     }
     .pill[data-status="idle"]{ background: var(--status-idle); }
     .pill[data-status="loading"]{ background: var(--status-loading); }
@@ -232,31 +231,34 @@
     .chartWrap{ height: 320px; }
     .chartWrap.short{ height: 260px; }
 
-    /* ✅ Table scroll + frozen Date column */
+    /* ---------- TABLE (SCROLL + STICKY DATE) ---------- */
     .tableScroll{
-      overflow-x: auto;
-      overflow-y: hidden;
-      max-width: 100%;
-      -webkit-overflow-scrolling: touch;
-      border-radius: 18px;
+      display:block;
+      position:relative;
+      width:100%;
+      max-width:100%;
+      overflow-x:auto;
+      overflow-y:hidden;
+      -webkit-overflow-scrolling:touch;
+      border-radius:18px;
       border: 1px solid rgba(31,36,48,.10);
       background: rgba(255,255,255,.6);
+      touch-action: pan-x;
     }
 
     table{
-      width: max-content; /* ✅ allow content to exceed container so horizontal scroll happens */
-      min-width: 100%;
-      border-collapse: collapse;
-      border-radius: 18px;
+      display:inline-table;     /* ✅ key: allows real overflow */
+      width:max-content;        /* ✅ key */
+      min-width:100%;
+      border-collapse: separate;
+      border-spacing: 0;
       background: transparent;
     }
-
     th, td{ padding: 10px 10px; text-align:left; font-size: 13px; white-space: nowrap; }
     th{ font-size: 12px; color: var(--muted); font-weight: 900; background: rgba(31,36,48,.03); }
     tr+tr td{ border-top: 1px solid rgba(31,36,48,.06); }
     .right{ text-align:right; }
 
-    /* Freeze first column */
     th.sticky, td.sticky{
       position: sticky;
       left: 0;
@@ -326,35 +328,31 @@
       cursor:pointer;
     }
 
-    /* ✅ Image dialog: keep big images on screen + allow cycle controls */
     dialog#imgDialog{
-      border:none; border-radius:22px; padding:0;
+      border:none;border-radius:22px;padding:0;
       width:min(860px,92vw);
       max-height: 92vh;
       box-shadow:0 10px 30px rgba(31,36,48,.12);
       overflow:hidden;
     }
-    #imgDialog .imgBody{
-      padding:12px;
-      max-height: calc(92vh - 62px);
-      overflow:auto;
-    }
     #imgDialogImg{
-      display:block;
+      max-height: 76vh;
       width: 100%;
       height: auto;
-      max-height: 78vh;
       object-fit: contain;
-      margin: 0 auto;
+      display:block;
     }
-    .iconBtn{
+
+    .imgNavBtn{
+      border: 1px solid rgba(31,36,48,.14);
+      background: rgba(255,255,255,.9);
+      border-radius: 999px;
       padding: 8px 10px;
-      min-width: 42px;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      gap:8px;
+      font-weight: 900;
+      font-size: 12px;
+      cursor: pointer;
     }
+    .imgNavBtn:disabled{ opacity:.5; cursor:not-allowed; }
   </style>
 </head>
 
@@ -372,12 +370,13 @@
             ⏱️ Litter age: <span id="ageTicker" style="font-weight:900;">—</span>
           </span>
 
-          <span class="pill" title="Countdown until 6 weeks from birth time">
-            🗓️ Adoptable in: <span id="adoptTicker" style="font-weight:900;">—</span>
+          <span class="pill" title="Born date">
+            🎂 Born: <span id="bornDate">—</span>
           </span>
 
-          <span class="pill" title="Born date & time">
-            🎂 Born: <span id="bornDate">—</span>
+          <!-- ✅ new: adoption countdown -->
+          <span class="pill" title="Countdown to 6 weeks (adoption)">
+            🏁 Adoptable in: <span id="adoptTicker" style="font-weight:900;">—</span>
           </span>
 
           <span class="pill" id="statusPill" data-status="idle" title="Save status">
@@ -396,7 +395,7 @@
               <div class="small">Switch tabs • choose “All kittens” vs selected • units anytime</div>
             </div>
             <div class="controls">
-              <label style="width:170px;">
+              <label style="width:160px;">
                 Units
                 <select id="unitSelect">
                   <option value="oz">Ounces (oz)</option>
@@ -431,10 +430,12 @@
               <div class="chartWrap short" id="wrap-pie" style="display:none;"><canvas id="chartPie"></canvas></div>
 
               <div id="wrap-table" style="display:none;">
-                <div class="small" style="margin-bottom:8px;">All kitten weights by date (scroll →, Date stays frozen)</div>
-                <div class="tableScroll">
+                <div class="small" style="margin-bottom:8px;">All kitten weights by date</div>
+                <!-- ✅ FIX: real horizontal scroll container -->
+                <div class="tableScroll" tabindex="0" aria-label="Scrollable weights table">
                   <table id="weightsTable"></table>
                 </div>
+                <div class="small" style="margin-top:8px;">Tip: Hold Shift + scroll wheel (or trackpad) to scroll sideways.</div>
               </div>
             </div>
           </div>
@@ -520,19 +521,21 @@
     </form>
   </dialog>
 
+  <!-- ✅ Updated dialog: next/prev + close -->
   <dialog id="imgDialog">
     <div style="background:rgba(255,255,255,.96);border:1px solid rgba(31,36,48,.14);">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 12px;border-bottom:1px solid rgba(31,36,48,.10);">
         <div style="font-family:Fredoka, Nunito;font-size:16px;font-weight:600;" id="imgDialogTitle">Photo</div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <button class="btn iconBtn" id="imgPrev" title="Previous photo" type="button">◀</button>
-          <button class="btn iconBtn" id="imgNext" title="Next photo" type="button">▶</button>
-          <button class="btn iconBtn" id="imgDialogClose" title="Close" type="button">✖</button>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button class="imgNavBtn" id="imgPrevBtn" title="Previous (←)">◀</button>
+          <button class="imgNavBtn" id="imgNextBtn" title="Next (→)">▶</button>
+          <button class="btn" id="imgDialogClose">✖</button>
         </div>
       </div>
-      <div class="imgBody">
+      <div style="padding:12px;">
         <img id="imgDialogImg" alt="Photo" style="border-radius:18px;border:1px solid rgba(31,36,48,.10);background:rgba(255,255,255,.6);" />
       </div>
+      <div class="small" style="padding:0 12px 12px;">Tip: Use ← / → keys to cycle photos.</div>
     </div>
   </dialog>
 
@@ -543,50 +546,66 @@
     const BACKEND_URL = "https://script.google.com/macros/s/AKfycbywFoKrm8lye1kfiT8q9Mgu6hEdQpJzQvWzw60tVR_BLE91bD8mdyJEmn9sZd6udg4coA/exec";
     const STORAGE_KEY = "kitten-growth-tracker:state:v2";
 
-    // Birth moment: Dec 30 @ 6:00 PM (explicit offset so the clock is consistent)
-    const LITTER_BIRTH_MOMENT_ISO = "2025-12-30T18:00:00-05:00";
+    // ✅ Birth is Dec 30 at 6pm (America/New_York offset)
+    const LITTER_BIRTHDATETIME_ISO = "2025-12-30T18:00:00-05:00";
+    const LITTER_BIRTHDATE_ISO = "2025-12-30"; // for display + day labeling
 
+    // ✅ Adoption countdown: 6 weeks from birth datetime
+    const ADOPTION_WEEKS = 6;
+
+    // Admin unlock code
     const ADMIN_CODE = "McRae";
     const ADMIN_KEY = "kitten-growth-tracker:admin:v1";
-
-    const ADOPT_WEEKS = 6;
 
     /***********************
      * SEED DATA
      ***********************/
     const SEED = {
       unit: "oz",
-      litterBirthDateISO: LITTER_BIRTH_MOMENT_ISO,
-      litterMomPhotos: [],
+      litterBirthDateISO: LITTER_BIRTHDATE_ISO,
+      litterBirthDateTimeISO: LITTER_BIRTHDATETIME_ISO,
+      litterMomPhotos: [], // [{url, fileId, addedAt}]
       kittens: [
         { id:"orange", name:"Orange", emoji:"🐱", tag:"Orange", description:"", status:"Available",
           adopter:{name:"",email:"",phone:"",notesEntries:[]},
-          notesEntries:[], photos:[], milestones:[],
+          notesEntries:[],
+          photos:[],
+          milestones:[],
           weighIns:[{date:"2026-01-01",oz:4.88},{date:"2026-01-03",oz:6.03},{date:"2026-01-05",oz:7.13}]
         },
         { id:"blackie", name:"Blackie", emoji:"🐈‍⬛", tag:"Black", description:"", status:"Available",
           adopter:{name:"",email:"",phone:"",notesEntries:[]},
-          notesEntries:[], photos:[], milestones:[],
+          notesEntries:[],
+          photos:[],
+          milestones:[],
           weighIns:[{date:"2026-01-01",oz:3.877},{date:"2026-01-03",oz:5.407},{date:"2026-01-05",oz:6.63}]
         },
         { id:"tux", name:"Tux", emoji:"🎩", tag:"Tux", description:"", status:"Available",
           adopter:{name:"",email:"",phone:"",notesEntries:[]},
-          notesEntries:[], photos:[], milestones:[],
+          notesEntries:[],
+          photos:[],
+          milestones:[],
           weighIns:[{date:"2026-01-01",oz:5.255},{date:"2026-01-03",oz:6.49},{date:"2026-01-05",oz:7.5}]
         },
         { id:"tux2", name:"Tux 2", emoji:"🧦", tag:"Tux", description:"White stripe on left leg", status:"Available",
           adopter:{name:"",email:"",phone:"",notesEntries:[]},
-          notesEntries:[], photos:[], milestones:[],
+          notesEntries:[],
+          photos:[],
+          milestones:[],
           weighIns:[{date:"2026-01-01",oz:5.04},{date:"2026-01-03",oz:6.48},{date:"2026-01-05",oz:7.17}]
         },
         { id:"tortie", name:"Tortie", emoji:"🍂", tag:"Tortie", description:"", status:"Available",
           adopter:{name:"",email:"",phone:"",notesEntries:[]},
-          notesEntries:[], photos:[], milestones:[],
+          notesEntries:[],
+          photos:[],
+          milestones:[],
           weighIns:[{date:"2026-01-01",oz:4.38},{date:"2026-01-03",oz:5.65},{date:"2026-01-05",oz:7.0}]
         },
         { id:"calico", name:"Calico", emoji:"🌸", tag:"Calico", description:"", status:"Available",
           adopter:{name:"",email:"",phone:"",notesEntries:[]},
-          notesEntries:[], photos:[], milestones:[],
+          notesEntries:[],
+          photos:[],
+          milestones:[],
           weighIns:[{date:"2026-01-01",oz:4.504},{date:"2026-01-03",oz:6.1},{date:"2026-01-05",oz:7.06}]
         },
       ]
@@ -601,6 +620,8 @@
 
     const ozToG = (oz) => oz * 28.349523125;
     const gToOz = (g) => g / 28.349523125;
+
+    // ✅ pounds conversions
     const ozToLb = (oz) => oz / 16;
     const lbToOz = (lb) => lb * 16;
 
@@ -610,17 +631,16 @@
       return Number(n).toFixed(d);
     };
 
-    const dateOnly = (isoLike) => String(isoLike || "").split("T")[0];
-
     const dayDiffISO = (aISO, bISO) => {
-      const a = new Date(dateOnly(aISO) + "T00:00:00");
-      const b = new Date(dateOnly(bISO) + "T00:00:00");
+      const a = new Date(aISO + "T00:00:00");
+      const b = new Date(bISO + "T00:00:00");
       return Math.round((b.getTime() - a.getTime()) / (1000*60*60*24));
     };
 
+    // ✅ time-based age ticker start
     const msSinceISO = (iso) => Date.now() - new Date(iso).getTime();
 
-    const formatDuration = (ms) => {
+    const formatAge = (ms) => {
       const s = Math.max(0, Math.floor(ms/1000));
       const days = Math.floor(s/86400);
       const hrs = Math.floor((s%86400)/3600);
@@ -633,12 +653,6 @@
       const set = new Set();
       state.kittens.forEach(k => (k.weighIns||[]).forEach(w => set.add(w.date)));
       return Array.from(set).sort();
-    };
-
-    const digitsForUnit = (unit) => {
-      if (unit === "g") return 1;
-      if (unit === "lb") return 3;
-      return 3; // oz
     };
 
     const getVal = (w) => {
@@ -662,6 +676,8 @@
       if (!s || typeof s !== "object") return deepClone(SEED);
       if (!Array.isArray(s.kittens)) s.kittens = deepClone(SEED.kittens);
       if (!Array.isArray(s.litterMomPhotos)) s.litterMomPhotos = [];
+      if (!s.litterBirthDateISO) s.litterBirthDateISO = LITTER_BIRTHDATE_ISO;
+      if (!s.litterBirthDateTimeISO) s.litterBirthDateTimeISO = LITTER_BIRTHDATETIME_ISO;
       s.kittens.forEach(ensureKittenShape);
       return s;
     };
@@ -672,6 +688,7 @@
 
       merged.unit = (incoming.unit === "g" || incoming.unit === "lb") ? incoming.unit : "oz";
       merged.litterBirthDateISO = incoming.litterBirthDateISO || merged.litterBirthDateISO;
+      merged.litterBirthDateTimeISO = incoming.litterBirthDateTimeISO || merged.litterBirthDateTimeISO;
       merged.litterMomPhotos = Array.isArray(incoming.litterMomPhotos) ? incoming.litterMomPhotos : merged.litterMomPhotos;
 
       const byId = new Map((incoming.kittens || []).map(k => [k.id, k]));
@@ -712,7 +729,7 @@
     const kittenMatches = (k, q) => {
       if (!q) return true;
       const t = q.toLowerCase();
-      return [k.name, k.tag, k.description, k.status, k.adopter?.name, k.adopter?.email, k.adopter?.phone]
+      return [k.name, k.tag, k.description, k.status, k.adopter?.name]
         .some(v => String(v || "").toLowerCase().includes(t));
     };
 
@@ -741,26 +758,14 @@
 
     const nowISO = () => new Date().toISOString();
 
-    const formatBornLabel = (iso) => {
-      const d = new Date(iso);
-      if (isNaN(d.getTime())) return String(iso || "—");
-      return d.toLocaleString(undefined, { year:"numeric", month:"short", day:"numeric", hour:"numeric", minute:"2-digit" });
-    };
-
-    const addWeeksISO = (iso, weeks) => {
-      const d = new Date(iso);
-      d.setTime(d.getTime() + weeks * 7 * 24 * 60 * 60 * 1000);
-      return d.toISOString();
-    };
-
-    // Drive helpers (thumb stays intentionally scaled)
-    const driveThumbUrl = (fileId, width = 800) =>
+    // ✅ Drive helpers
+    // Thumbnails: smaller by default so they don’t look “scaled up”
+    const driveThumbUrl = (fileId, width = 400) =>
       `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w${width}`;
 
+    // Full-size: use uc?id (more stable than huge thumbnail sizing)
     const driveViewUrl = (fileId) =>
       `https://drive.google.com/uc?id=${encodeURIComponent(fileId)}`;
-
-    const fullSrcFor = (p) => (p?.fileId ? driveThumbUrl(p.fileId, 2000) : (p?.url || ""));
 
     /***********************
      * ADMIN
@@ -862,7 +867,7 @@
 
       const data = await safeJson(res);
       if (!res.ok || !data.ok) throw new Error(data.error || `Upload failed (${res.status})`);
-      return data;
+      return data; // { ok, fileId, url, name }
     }
 
     function fileToCompressedBase64(file, maxSizePx, quality) {
@@ -945,56 +950,57 @@
     const imgDialogImg = document.getElementById("imgDialogImg");
     const imgDialogTitle = document.getElementById("imgDialogTitle");
     const imgDialogClose = document.getElementById("imgDialogClose");
-    const imgPrev = document.getElementById("imgPrev");
-    const imgNext = document.getElementById("imgNext");
+    const imgPrevBtn = document.getElementById("imgPrevBtn");
+    const imgNextBtn = document.getElementById("imgNextBtn");
+
+    imgDialogClose.addEventListener("click", () => imgDialog.close());
 
     /***********************
-     * PHOTO CYCLING (dialog)
+     * IMAGE DIALOG CYCLING
      ***********************/
-    let activeGallery = { items: [], index: 0, title: "Photo" };
+    let imgContext = { items: [], idx: 0, title: "Photo" };
 
-    const openGalleryAt = ({ items, index, title }) => {
-      const safeItems = Array.isArray(items) ? items : [];
-      if (!safeItems.length) return;
+    const getDialogSrc = (p, widthThumb=2000) => {
+      if (p?.fileId) return driveViewUrl(p.fileId); // ✅ full view: stable
+      return p?.url || "";
+    };
 
-      activeGallery.items = safeItems;
-      activeGallery.index = Math.max(0, Math.min(safeItems.length - 1, Number(index) || 0));
-      activeGallery.title = title || "Photo";
+    const updateImgDialogNav = () => {
+      const n = imgContext.items.length;
+      imgPrevBtn.disabled = n <= 1;
+      imgNextBtn.disabled = n <= 1;
+      const label = n ? ` (${imgContext.idx+1}/${n})` : "";
+      imgDialogTitle.textContent = imgContext.title + label;
+      const p = imgContext.items[imgContext.idx];
+      imgDialogImg.src = getDialogSrc(p);
+    };
 
-      renderActivePhoto();
+    const openImgDialog = ({ items, idx, title }) => {
+      imgContext.items = Array.isArray(items) ? items : [];
+      imgContext.idx = Math.max(0, Math.min(imgContext.items.length-1, idx || 0));
+      imgContext.title = title || "Photo";
+      updateImgDialogNav();
       imgDialog.showModal();
     };
 
-    const renderActivePhoto = () => {
-      const items = activeGallery.items || [];
-      const i = activeGallery.index || 0;
-      const p = items[i];
-      if (!p) return;
+    imgPrevBtn.addEventListener("click", () => {
+      const n = imgContext.items.length;
+      if (n <= 1) return;
+      imgContext.idx = (imgContext.idx - 1 + n) % n;
+      updateImgDialogNav();
+    });
 
-      imgDialogTitle.textContent = `${activeGallery.title} • ${i+1}/${items.length}`;
-      imgDialogImg.src = fullSrcFor(p);
+    imgNextBtn.addEventListener("click", () => {
+      const n = imgContext.items.length;
+      if (n <= 1) return;
+      imgContext.idx = (imgContext.idx + 1) % n;
+      updateImgDialogNav();
+    });
 
-      imgPrev.disabled = items.length <= 1;
-      imgNext.disabled = items.length <= 1;
-    };
-
-    const stepPhoto = (dir) => {
-      const items = activeGallery.items || [];
-      if (items.length <= 1) return;
-      const n = items.length;
-      activeGallery.index = (activeGallery.index + dir + n) % n;
-      renderActivePhoto();
-    };
-
-    imgPrev.addEventListener("click", () => stepPhoto(-1));
-    imgNext.addEventListener("click", () => stepPhoto(+1));
-    imgDialogClose.addEventListener("click", () => imgDialog.close());
-
-    // keyboard support while dialog is open
     window.addEventListener("keydown", (e) => {
       if (!imgDialog.open) return;
-      if (e.key === "ArrowLeft") { e.preventDefault(); stepPhoto(-1); }
-      if (e.key === "ArrowRight") { e.preventDefault(); stepPhoto(+1); }
+      if (e.key === "ArrowLeft") { e.preventDefault(); imgPrevBtn.click(); }
+      if (e.key === "ArrowRight") { e.preventDefault(); imgNextBtn.click(); }
       if (e.key === "Escape") { imgDialog.close(); }
     });
 
@@ -1016,6 +1022,8 @@
       const all = allToggle.checked;
       return all ? state.kittens : state.kittens.filter(k => k.id === selectedId);
     };
+
+    const digitsForUnit = () => (state.unit === "g" ? 1 : (state.unit === "lb" ? 3 : 3));
 
     const buildGrowthData = () => {
       const dates = allDates();
@@ -1133,7 +1141,7 @@
                   const v = item.raw;
                   if (v == null) return `${item.dataset.label}: —`;
                   if (type === "pie") return `${item.label}: ${v}`;
-                  const digits = digitsForUnit(state.unit);
+                  const digits = digitsForUnit();
                   return `${item.dataset.label}: ${fmt(v, digits)} ${state.unit}`;
                 }
               }
@@ -1167,7 +1175,8 @@
     const renderWeightsTable = () => {
       const dates = allDates();
       const kittens = state.kittens;
-      const digits = digitsForUnit(state.unit);
+
+      const digits = digitsForUnit();
 
       const thead = `
         <thead>
@@ -1214,12 +1223,13 @@
         const lastV = last ? getVal(last) : null;
         const prevV = prev ? getVal(prev) : null;
         const delta = (last && prev) ? (lastV - prevV) : null;
-        const digits = digitsForUnit(state.unit);
+        const digits = digitsForUnit();
         const deltaText = delta == null ? "" : `${delta >= 0 ? "+" : ""}${fmt(delta, digits)} ${state.unit}`;
 
-        const personName = (k.adopter?.name || "").trim();
-        const showPerson = personName && (k.status === "Reserved" || k.status === "Adopted");
-        const personLabel = k.status === "Reserved" ? "reserved by" : "adopted by";
+        // ✅ show reserver/adopter name on roster when present
+        const hasPerson = (k.adopter?.name || "").trim().length > 0 && (k.status === "Reserved" || k.status === "Adopted");
+        const whoLabel = k.status === "Adopted" ? "adopted by" : "reserved by";
+        const whoText = hasPerson ? ` • ${whoLabel}: ${escapeHtml(k.adopter.name)}` : "";
 
         return `
           <div class="krow ${k.id === selectedId ? "active" : ""}" data-id="${k.id}">
@@ -1230,12 +1240,12 @@
                   <div style="font-weight: 900;">${escapeHtml(k.name)}</div>
                   <div class="kmeta">
                     ${escapeHtml(k.description ? k.description : (k.tag || ""))}
-                    ${showPerson ? ` • ${personLabel}: ${escapeHtml(personName)}` : ""}
+                    ${whoText}
                   </div>
                 </div>
               </div>
             </div>
-            <div style="text-align:right; min-width: 140px;">
+            <div style="text-align:right; min-width: 130px;">
               <div>${statusBadge(k.status)}</div>
               <div class="kmeta" style="margin-top:4px;">
                 ${last ? `${fmt(lastV, digits)} ${state.unit}` : "—"}
@@ -1257,7 +1267,10 @@
     const renderGallery = ({ photos, containerEl, allowDelete, onDelete, onView }) => {
       const items = Array.isArray(photos) ? photos : [];
 
-      const thumbSrcFor = (p) => (p?.fileId ? driveThumbUrl(p.fileId, 800) : (p?.url || ""));
+      const thumbSrcFor = (p) => {
+        if (p?.fileId) return driveThumbUrl(p.fileId, 400);
+        return p?.url || "";
+      };
 
       containerEl.innerHTML = items.map((p, idx) => {
         const src = escapeHtml(thumbSrcFor(p));
@@ -1276,7 +1289,7 @@
           if (x != null) return;
           const p = items[idx];
           if (!p) return;
-          onView(p, idx, items);
+          onView(items, idx);
         });
       });
 
@@ -1313,7 +1326,7 @@
       selectedNamePill.textContent = `${k.emoji || "🐾"} ${k.name}`;
       selectedSub.textContent = `${k.tag || ""}${k.description ? " • " + k.description : ""}`.trim() || "—";
 
-      const digits = digitsForUnit(state.unit);
+      const digits = digitsForUnit();
 
       const last = latestWeighIn(k);
       const prev = prevWeighIn(k);
@@ -1361,9 +1374,9 @@
 
         <div class="statRow" style="margin-top: 12px;">
           <div class="stat"><div class="t">Latest weight</div><div class="v">${lastV == null ? "—" : fmt(lastV, digits)} ${state.unit}</div><div class="s">${escapeHtml(last?.date || "")}</div></div>
-          <div class="stat"><div class="t">Age at latest</div><div class="v">${ageDays == null ? "—" : ageDays} days</div><div class="s">born ${escapeHtml(formatBornLabel(state.litterBirthDateISO))}</div></div>
+          <div class="stat"><div class="t">Age at latest</div><div class="v">${ageDays == null ? "—" : ageDays} days</div><div class="s">born ${escapeHtml(state.litterBirthDateISO)}</div></div>
           <div class="stat"><div class="t">Change since last</div><div class="v">${delta == null ? "—" : `${delta >= 0 ? "+" : ""}${fmt(delta, digits)} ${state.unit}`}</div><div class="s">${prev ? `${escapeHtml(prev.date)} → ${escapeHtml(last?.date || "")}` : ""}</div></div>
-          <div class="stat"><div class="t">Avg / day</div><div class="v">${deltaPerDay == null ? "—" : fmt(deltaPerDay, digits)} ${state.unit}/day</div><div class="s">(last interval)</div></div>
+          <div class="stat"><div class="t">Avg / day</div><div class="v">${deltaPerDay == null ? "—" : fmt(deltaPerDay, digitsForUnit())} ${state.unit}/day</div><div class="s">(last interval)</div></div>
         </div>
 
         <div class="two" style="margin-top: 14px;">
@@ -1406,14 +1419,14 @@
 
           <div class="card" style="box-shadow:none; background: rgba(255,255,255,.55);">
             <div class="head" style="border-bottom:none;">
-              <div><h2>Adopter / Reserver</h2><div class="small">Enabled by setting status to Reserved or Adopted</div></div>
+              <div><h2>Adopter</h2><div class="small">Enabled by setting status to Reserved or Adopted</div></div>
             </div>
             <div class="body">
-              <div class="small">${adopterEnabled ? "Details enabled." : "Set status to Reserved or Adopted to enable details."}</div>
+              <div class="small">${adopterEnabled ? "Adopter details enabled." : "Set status to Reserved or Adopted to enable adopter details."}</div>
 
               <div class="two" style="margin-top: 10px;">
                 <div>
-                  <label>Name</label>
+                  <label>Adopter name</label>
                   <input id="a_name" value="${escapeHtml(k.adopter.name || "")}" ${(editing && adopterEnabled) ? "" : "disabled"} />
                 </div>
                 <div>
@@ -1427,7 +1440,7 @@
               </div>
 
               <div style="margin-top: 12px;">
-                <label>Add note</label>
+                <label>Add adopter note</label>
                 <textarea id="a_note_new" ${(editing && adopterEnabled) ? "" : "disabled"} placeholder="Add a note (saved with date)…"></textarea>
                 <div style="margin-top: 10px; display:flex; justify-content:flex-end; gap:10px;">
                   <button class="btn pink" id="addAdopterNoteBtn" ${(editing && adopterEnabled) ? "" : "disabled"}>➕ Save note</button>
@@ -1435,7 +1448,7 @@
               </div>
 
               <div style="margin-top: 12px;">
-                <label>Saved notes</label>
+                <label>Saved adopter notes</label>
                 <div id="a_notes_list">${renderEntries(k.adopter.notesEntries)}</div>
               </div>
             </div>
@@ -1446,7 +1459,7 @@
           <div class="card" style="box-shadow:none; background: rgba(255,255,255,.55);">
             <div class="head" style="border-bottom:none;"><div><h2>Weigh-ins</h2><div class="small">Date • age (days) • weight</div></div></div>
             <div class="body">
-              <table style="width:100%;min-width:0;">
+              <table style="display:table;width:100%;min-width:0;">
                 <thead>
                   <tr><th style="width: 30%">Date</th><th style="width: 18%">Age (days)</th><th>Weight</th><th class="right" style="width: 110px;">Action</th></tr>
                 </thead>
@@ -1579,12 +1592,8 @@
           markDirtyAndScheduleSave();
           renderAll(false);
         },
-        onView: (_p, idx, items) => {
-          openGalleryAt({
-            items,
-            index: idx,
-            title: `${k.name} • Photo`
-          });
+        onView: (items, idx) => {
+          openImgDialog({ items, idx, title: `${k.name} • Photo` });
         }
       });
 
@@ -1625,19 +1634,15 @@
           markDirtyAndScheduleSave();
           renderAll(false);
         },
-        onView: (_p, idx, items) => {
-          openGalleryAt({
-            items,
-            index: idx,
-            title: `Litter & Mom • Photo`
-          });
+        onView: (items, idx) => {
+          openImgDialog({ items, idx, title: `Litter & Mom • Photo` });
         }
       });
     };
 
     const renderAll = (rebuild=true) => {
       unitSelect.value = state.unit;
-      bornDateEl.textContent = formatBornLabel(state.litterBirthDateISO);
+      bornDateEl.textContent = state.litterBirthDateISO;
 
       adminBtn.textContent = isAdmin() ? "🔓 Admin" : "🔒 Admin";
 
@@ -1722,10 +1727,9 @@
         return;
       }
 
-      const oz =
-        (state.unit === "g")  ? gToOz(num)  :
-        (state.unit === "lb") ? lbToOz(num) :
-        num;
+      let oz = num;
+      if (state.unit === "g") oz = gToOz(num);
+      if (state.unit === "lb") oz = lbToOz(num);
 
       const existing = (k.weighIns || []).find(w => w.date === date);
       if (existing) existing.oz = oz;
@@ -1762,22 +1766,20 @@
     });
 
     /***********************
-     * AGE + ADOPTION TICKERS
+     * AGE + ADOPTION COUNTDOWN
      ***********************/
-    const tickAgeAndCountdown = () => {
-      const age = formatDuration(msSinceISO(state.litterBirthDateISO));
-      ageTickerEl.textContent =
-        `${age.days}d ${String(age.hrs).padStart(2,"0")}h ${String(age.mins).padStart(2,"0")}m ${String(age.secs).padStart(2,"0")}s`;
+    const tickAge = () => {
+      const a = formatAge(msSinceISO(state.litterBirthDateTimeISO));
+      ageTickerEl.textContent = `${a.days}d ${String(a.hrs).padStart(2,"0")}h ${String(a.mins).padStart(2,"0")}m ${String(a.secs).padStart(2,"0")}s`;
 
-      const adoptAtISO = addWeeksISO(state.litterBirthDateISO, ADOPT_WEEKS);
-      const msLeft = new Date(adoptAtISO).getTime() - Date.now();
-
-      if (msLeft <= 0) {
+      const bornMs = new Date(state.litterBirthDateTimeISO).getTime();
+      const adoptMs = bornMs + (ADOPTION_WEEKS * 7 * 24 * 60 * 60 * 1000);
+      const left = adoptMs - Date.now();
+      if (left <= 0) {
         adoptTickerEl.textContent = "🎉 Adoptable!";
       } else {
-        const left = formatDuration(msLeft);
-        adoptTickerEl.textContent =
-          `${left.days}d ${String(left.hrs).padStart(2,"0")}h ${String(left.mins).padStart(2,"0")}m ${String(left.secs).padStart(2,"0")}s`;
+        const r = formatAge(left);
+        adoptTickerEl.textContent = `${r.days}d ${String(r.hrs).padStart(2,"0")}h ${String(r.mins).padStart(2,"0")}m ${String(r.secs).padStart(2,"0")}s`;
       }
     };
 
@@ -1790,10 +1792,10 @@
 
     const init = async () => {
       renderStatus();
-      bornDateEl.textContent = formatBornLabel(state.litterBirthDateISO);
+      bornDateEl.textContent = state.litterBirthDateISO;
 
-      tickAgeAndCountdown();
-      setInterval(tickAgeAndCountdown, 1000);
+      tickAge();
+      setInterval(tickAge, 1000);
 
       try {
         setStatus("loading", "Loading…");
