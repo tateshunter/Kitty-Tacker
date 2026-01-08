@@ -31,12 +31,12 @@
       --bad: #a12121;
       --radius: 22px;
 
-      --pill-idle: rgba(255,255,255,.65);
-      --pill-loading: rgba(216,199,255,.65);
-      --pill-saving: rgba(186,247,230,.65);
-      --pill-synced: rgba(186,247,230,.75);
-      --pill-dirty: rgba(255,183,209,.65);
-      --pill-error: rgba(255,200,200,.65);
+      --status-idle: rgba(255,255,255,.65);
+      --status-loading: rgba(216,199,255,.65);
+      --status-saving: rgba(186,247,230,.65);
+      --status-synced: rgba(186,247,230,.75);
+      --status-dirty: rgba(255,183,209,.65);
+      --status-error: rgba(255,200,200,.65);
     }
 
     *{ box-sizing: border-box; }
@@ -109,12 +109,12 @@
       color: rgba(31,36,48,.8);
       backdrop-filter: blur(8px);
     }
-    .pill[data-status="idle"]{ background: var(--pill-idle); }
-    .pill[data-status="loading"]{ background: var(--pill-loading); }
-    .pill[data-status="saving"]{ background: var(--pill-saving); }
-    .pill[data-status="synced"]{ background: var(--pill-synced); }
-    .pill[data-status="dirty"]{ background: var(--pill-dirty); }
-    .pill[data-status="error"]{ background: var(--pill-error); }
+    .pill[data-status="idle"]{ background: var(--status-idle); }
+    .pill[data-status="loading"]{ background: var(--status-loading); }
+    .pill[data-status="saving"]{ background: var(--status-saving); }
+    .pill[data-status="synced"]{ background: var(--status-synced); }
+    .pill[data-status="dirty"]{ background: var(--status-dirty); }
+    .pill[data-status="error"]{ background: var(--status-error); }
 
     .btn{
       appearance:none;
@@ -239,10 +239,12 @@
       border: 1px solid rgba(31,36,48,.10);
       background: rgba(255,255,255,.6);
     }
-    th, td{ padding: 10px 10px; text-align:left; font-size: 13px; vertical-align: top; }
-    th{ font-size: 12px; color: var(--muted); font-weight: 900; background: rgba(31,36,48,.03); position: sticky; top: 0; z-index: 1; }
+    th, td{ padding: 10px 10px; text-align:left; font-size: 13px; }
+    th{ font-size: 12px; color: var(--muted); font-weight: 900; background: rgba(31,36,48,.03); }
     tr+tr td{ border-top: 1px solid rgba(31,36,48,.06); }
+    .right{ text-align:right; }
 
+    .footer{ padding: 14px 18px 18px; color: var(--muted); font-size: 12px; }
     .kheader{ display:flex; align-items:center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
     .bigEmoji{ font-size: 30px; }
     .statRow{ display:grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
@@ -254,46 +256,57 @@
 
     .miniActions{ display:flex; gap: 8px; flex-wrap: wrap; }
 
-    .noteList{
-      margin-top: 10px;
+    .gallery{
       display:grid;
+      grid-template-columns: repeat(6, 1fr);
       gap: 8px;
     }
-    .noteItem{
-      border: 1px solid rgba(31,36,48,.10);
+    @media (max-width: 980px){ .gallery{ grid-template-columns: repeat(4, 1fr); } }
+    @media (max-width: 520px){ .gallery{ grid-template-columns: repeat(3, 1fr); } }
+
+    .thumb{
+      position: relative;
       border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(31,36,48,.12);
       background: rgba(255,255,255,.7);
-      padding: 10px 12px;
-    }
-    .noteItem .d{
-      font-size: 11px;
-      font-weight: 900;
-      color: rgba(31,36,48,.75);
+      aspect-ratio: 1 / 1;
       display:flex;
       align-items:center;
-      justify-content: space-between;
-      gap: 10px;
+      justify-content:center;
+      cursor: pointer;
+      transition: transform .06s ease;
     }
-    .noteItem .t{
-      margin-top: 6px;
-      white-space: pre-wrap;
-      font-size: 13px;
-      color: rgba(31,36,48,.92);
+    .thumb:hover{ transform: translateY(-1px); }
+    .thumb img{
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display:block;
     }
-    .soft{
-      opacity: .75;
-      font-weight: 800;
+    .thumb .x{
+      position:absolute;
+      top: 6px;
+      right: 6px;
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      border: 1px solid rgba(31,36,48,.14);
+      background: rgba(255,255,255,.9);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight: 900;
       font-size: 12px;
+      cursor:pointer;
     }
 
-    .scrollBox{
-      max-height: 420px;
-      overflow: auto;
-      border-radius: 18px;
-      border: 1px solid rgba(31,36,48,.10);
-      background: rgba(255,255,255,.55);
+    dialog#imgDialog{
+      border:none;border-radius:22px;padding:0;
+      width:min(860px,92vw);
+      box-shadow:0 10px 30px rgba(31,36,48,.12);
+      overflow:hidden;
     }
-    .scrollBox > table{ border: none; border-radius: 0; background: transparent; }
   </style>
 </head>
 
@@ -303,7 +316,7 @@
       <header>
         <div>
           <h1>Kitten Growth Tracker <span aria-hidden>🐾</span></h1>
-          <div class="sub">Track weigh-ins, notes, and adopter info in one place.</div>
+          <div class="sub">Track weigh-ins, notes, and photos.</div>
         </div>
 
         <div class="row">
@@ -318,7 +331,7 @@
             <span id="statusText">✅ Saved</span>
           </span>
 
-          <button class="btn primary" id="adminBtn" title="Unlock editing">🔒 Admin</button>
+          <button class="btn primary" id="adminBtn" title="Admin unlock to edit">🔒 Admin</button>
         </div>
       </header>
 
@@ -326,8 +339,8 @@
         <div class="card">
           <div class="head">
             <div>
-              <h2>Charts</h2>
-              <div class="small">Hover for details • toggle “All kittens” vs selected • switch units anytime</div>
+              <h2>Charts & Views</h2>
+              <div class="small">Switch tabs • choose “All kittens” vs selected • units anytime</div>
             </div>
             <div class="controls">
               <label style="width:140px;">
@@ -340,6 +353,9 @@
               <label style="display:flex;align-items:center;gap:8px;width:auto;font-weight:900;">
                 <input id="allToggle" type="checkbox" checked> All kittens
               </label>
+              <div class="miniActions">
+                <button class="btn primary" id="addWeighBtn" title="Add a weigh-in (admin)">➕ Add weigh-in</button>
+              </div>
             </div>
           </div>
 
@@ -350,21 +366,21 @@
                 <button class="tabbtn" data-tab="latest" role="tab">🏆 Latest weights</button>
                 <button class="tabbtn" data-tab="avg" role="tab">✨ Litter avg</button>
                 <button class="tabbtn" data-tab="pie" role="tab">🥧 Pie</button>
-                <button class="tabbtn" data-tab="table" role="tab">📋 Table</button>
-              </div>
-              <div class="miniActions">
-                <button class="btn primary" id="addWeighBtn" title="Add a weigh-in for the selected kitten">➕ Add weigh-in</button>
+                <button class="tabbtn" data-tab="table" role="tab">🗓️ Table</button>
               </div>
             </div>
 
-            <div class="charts">
+            <div class="charts" style="margin-top:10px;">
               <div class="chartWrap" id="wrap-growth"><canvas id="chartGrowth"></canvas></div>
               <div class="chartWrap short" id="wrap-latest" style="display:none;"><canvas id="chartLatest"></canvas></div>
               <div class="chartWrap short" id="wrap-avg" style="display:none;"><canvas id="chartAvg"></canvas></div>
               <div class="chartWrap short" id="wrap-pie" style="display:none;"><canvas id="chartPie"></canvas></div>
+
               <div id="wrap-table" style="display:none;">
-                <div class="scrollBox" id="weightsTableWrap"></div>
-                <div class="small" style="margin-top: 8px;">Tip: rows are dates • columns are kittens • blanks mean no weigh-in for that date.</div>
+                <div class="small" style="margin-bottom:8px;">All kitten weights by date</div>
+                <div style="overflow:auto; border-radius:18px;">
+                  <table id="weightsTable"></table>
+                </div>
               </div>
             </div>
           </div>
@@ -374,7 +390,7 @@
           <div class="head">
             <div>
               <h2>Roster</h2>
-              <div class="small">6 kittens • tap one to view</div>
+              <div class="small">Tap a kitten to view profile</div>
             </div>
             <label style="width:190px;">
               Search
@@ -395,19 +411,34 @@
               </div>
               <div class="row">
                 <span class="pill" title="Currently selected kitten">🐾 <span id="selectedNamePill">—</span></span>
-                <span class="pill" id="adminPill" data-status="idle" title="Editing is locked/unlocked">
-                  <span id="adminText">🔒 Locked</span>
-                </span>
               </div>
             </div>
           </div>
           <div class="body" id="selectedPanel"></div>
         </div>
+
+        <div class="card" style="grid-column: 1 / -1;">
+          <div class="head">
+            <div>
+              <h2>Litter & Mom</h2>
+              <div class="small">Photo gallery</div>
+            </div>
+            <div class="row" style="justify-content:flex-end;">
+              <input id="litterPhotoFile" type="file" accept="image/*" style="max-width:260px;" />
+              <button class="btn pink" id="litterUploadBtn">📸 Add photo</button>
+            </div>
+          </div>
+          <div class="body">
+            <div id="litterGallery" class="gallery"></div>
+            <div class="small" style="margin-top:8px;">(Admin unlock required to add or delete.)</div>
+          </div>
+        </div>
       </div>
+
+      <div class="footer">Made for cozy kitten season. 💖</div>
     </div>
   </div>
 
-  <!-- Add weigh-in -->
   <dialog id="weighDialog" style="border:none;border-radius:22px;padding:0;width:min(520px,92vw);box-shadow:0 10px 30px rgba(31,36,48,.08);">
     <form method="dialog" style="padding:14px;background:rgba(255,255,255,.96);border:1px solid rgba(31,36,48,.14);border-radius:22px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
@@ -435,150 +466,89 @@
     </form>
   </dialog>
 
-  <!-- Admin unlock -->
-  <dialog id="adminDialog" style="border:none;border-radius:22px;padding:0;width:min(520px,92vw);box-shadow:0 10px 30px rgba(31,36,48,.08);">
-    <form method="dialog" style="padding:14px;background:rgba(255,255,255,.96);border:1px solid rgba(31,36,48,.14);border-radius:22px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div style="font-family:Fredoka, Nunito;font-size:16px;font-weight:600;">Admin</div>
-        <button class="btn" value="cancel" aria-label="Close">✖</button>
+  <dialog id="imgDialog">
+    <div style="background:rgba(255,255,255,.96);border:1px solid rgba(31,36,48,.14);">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 12px;border-bottom:1px solid rgba(31,36,48,.10);">
+        <div style="font-family:Fredoka, Nunito;font-size:16px;font-weight:600;" id="imgDialogTitle">Photo</div>
+        <button class="btn" id="imgDialogClose">✖</button>
       </div>
-
-      <div style="margin-top:10px;">
-        <label>Enter admin code</label>
-        <input id="adminCodeInput" type="password" placeholder="••••••" />
-        <div class="small" style="margin-top:6px;">Unlocks editing (profile, adopter info, notes, weigh-ins).</div>
+      <div style="padding:12px;">
+        <img id="imgDialogImg" alt="Photo" style="width:100%;height:auto;border-radius:18px;border:1px solid rgba(31,36,48,.10);background:rgba(255,255,255,.6);" />
       </div>
-
-      <div style="margin-top:10px;display:flex;gap:10px;justify-content:flex-end;">
-        <button class="btn" value="cancel">Cancel</button>
-        <button class="btn pink" id="adminUnlockBtn" value="default">Unlock</button>
-      </div>
-    </form>
+    </div>
   </dialog>
 
   <script>
     /***********************
      * CONFIG
      ***********************/
-    const BACKEND_URL = "https://script.google.com/macros/s/AKfycbwNFeBLgAJFaE3XLbQ5ijQAo4EYC4rvdWuQ2aoYy8tQng4a0_MbhIm331MPXLAaaEDPSw/exec";
-    const STORAGE_KEY = "kitten-growth-tracker:v2";
+    const BACKEND_URL = "https://script.google.com/macros/s/AKfycbzlw3-A1JB_T6lYEa5rSbTrPYoBp3UHZ9LsOFtgOtqM2epW-dbRJ4vZXzrSNieNHJ_NCg/exec";
+    const STORAGE_KEY = "kitten-growth-tracker:state:v2";
     const LITTER_BIRTHDATE_ISO = "2025-12-30";
 
-    // Admin code (as requested)
+    // Admin unlock code (as you requested)
     const ADMIN_CODE = "McRae";
+    const ADMIN_KEY = "kitten-growth-tracker:admin:v1";
 
     /***********************
      * SEED DATA
-     * Notes + adopterNotes are now dated entries:
-     *   notesEntries: [{dateISO, text}]
-     *   adopterNotesEntries: [{dateISO, text}]
      ***********************/
     const SEED = {
       unit: "oz",
       litterBirthDateISO: LITTER_BIRTHDATE_ISO,
+      litterMomPhotos: [], // [{url, fileId, addedAt}]
       kittens: [
         { id:"orange", name:"Orange", emoji:"🐱", tag:"Orange", description:"", status:"Available",
-          adopter:{name:"",email:"",phone:""},
-          adopterNotesEntries: [],
-          notesEntries: [],
-          weighIns:[{date:"2026-01-01",oz:4.88},{date:"2026-01-03",oz:6.03},{date:"2026-01-05",oz:7.13}] },
+          adopter:{name:"",email:"",phone:"",notesEntries:[]},
+          notesEntries:[],
+          photos:[], // [{url, fileId, addedAt}]
+          milestones:[],
+          weighIns:[{date:"2026-01-01",oz:4.88},{date:"2026-01-03",oz:6.03},{date:"2026-01-05",oz:7.13}]
+        },
         { id:"blackie", name:"Blackie", emoji:"🐈‍⬛", tag:"Black", description:"", status:"Available",
-          adopter:{name:"",email:"",phone:""},
-          adopterNotesEntries: [],
-          notesEntries: [],
-          weighIns:[{date:"2026-01-01",oz:3.877},{date:"2026-01-03",oz:5.407},{date:"2026-01-05",oz:6.63}] },
+          adopter:{name:"",email:"",phone:"",notesEntries:[]},
+          notesEntries:[],
+          photos:[],
+          milestones:[],
+          weighIns:[{date:"2026-01-01",oz:3.877},{date:"2026-01-03",oz:5.407},{date:"2026-01-05",oz:6.63}]
+        },
         { id:"tux", name:"Tux", emoji:"🎩", tag:"Tux", description:"", status:"Available",
-          adopter:{name:"",email:"",phone:""},
-          adopterNotesEntries: [],
-          notesEntries: [],
-          weighIns:[{date:"2026-01-01",oz:5.255},{date:"2026-01-03",oz:6.49},{date:"2026-01-05",oz:7.5}] },
+          adopter:{name:"",email:"",phone:"",notesEntries:[]},
+          notesEntries:[],
+          photos:[],
+          milestones:[],
+          weighIns:[{date:"2026-01-01",oz:5.255},{date:"2026-01-03",oz:6.49},{date:"2026-01-05",oz:7.5}]
+        },
         { id:"tux2", name:"Tux 2", emoji:"🧦", tag:"Tux", description:"White stripe on left leg", status:"Available",
-          adopter:{name:"",email:"",phone:""},
-          adopterNotesEntries: [],
-          notesEntries: [],
-          weighIns:[{date:"2026-01-01",oz:5.04},{date:"2026-01-03",oz:6.48},{date:"2026-01-05",oz:7.17}] },
+          adopter:{name:"",email:"",phone:"",notesEntries:[]},
+          notesEntries:[],
+          photos:[],
+          milestones:[],
+          weighIns:[{date:"2026-01-01",oz:5.04},{date:"2026-01-03",oz:6.48},{date:"2026-01-05",oz:7.17}]
+        },
         { id:"tortie", name:"Tortie", emoji:"🍂", tag:"Tortie", description:"", status:"Available",
-          adopter:{name:"",email:"",phone:""},
-          adopterNotesEntries: [],
-          notesEntries: [],
-          weighIns:[{date:"2026-01-01",oz:4.38},{date:"2026-01-03",oz:5.65},{date:"2026-01-05",oz:7.0}] },
+          adopter:{name:"",email:"",phone:"",notesEntries:[]},
+          notesEntries:[],
+          photos:[],
+          milestones:[],
+          weighIns:[{date:"2026-01-01",oz:4.38},{date:"2026-01-03",oz:5.65},{date:"2026-01-05",oz:7.0}]
+        },
         { id:"calico", name:"Calico", emoji:"🌸", tag:"Calico", description:"", status:"Available",
-          adopter:{name:"",email:"",phone:""},
-          adopterNotesEntries: [],
-          notesEntries: [],
-          weighIns:[{date:"2026-01-01",oz:4.504},{date:"2026-01-03",oz:6.1},{date:"2026-01-05",oz:7.06}] },
+          adopter:{name:"",email:"",phone:"",notesEntries:[]},
+          notesEntries:[],
+          photos:[],
+          milestones:[],
+          weighIns:[{date:"2026-01-01",oz:4.504},{date:"2026-01-03",oz:6.1},{date:"2026-01-05",oz:7.06}]
+        },
       ]
     };
 
     /***********************
-     * STATE + HELPERS
+     * HELPERS
      ***********************/
     const deepClone = (x) => JSON.parse(JSON.stringify(x));
     const sortWeighIns = (ws) => [...ws].sort((a,b) => String(a.date).localeCompare(String(b.date)));
-    const sortEntriesDesc = (arr) => [...(arr||[])].sort((a,b) => String(b.dateISO).localeCompare(String(a.dateISO)));
-
-    const todayISO = () => new Date().toISOString().slice(0,10);
-
-    const normalizeLegacyNotes = (k) => {
-      // Convert old "notes" string into notesEntries once
-      if (typeof k.notes === "string" && k.notes.trim()) {
-        k.notesEntries = k.notesEntries || [];
-        k.notesEntries.unshift({ dateISO: todayISO(), text: k.notes.trim() });
-      }
-      delete k.notes;
-
-      if (k.adopter && typeof k.adopter.notes === "string" && k.adopter.notes.trim()) {
-        k.adopterNotesEntries = k.adopterNotesEntries || [];
-        k.adopterNotesEntries.unshift({ dateISO: todayISO(), text: k.adopter.notes.trim() });
-      }
-      if (k.adopter) delete k.adopter.notes;
-      return k;
-    };
-
-    const mergeIntoSeed = (incoming) => {
-      const merged = deepClone(SEED);
-      if (!incoming || typeof incoming !== "object") return merged;
-
-      merged.unit = incoming.unit === "g" ? "g" : "oz";
-      merged.litterBirthDateISO = incoming.litterBirthDateISO || merged.litterBirthDateISO;
-
-      const byId = new Map((incoming.kittens || []).map(k => [k.id, k]));
-      merged.kittens = merged.kittens.map(k => {
-        const inc = byId.get(k.id);
-        if (!inc) return k;
-
-        const next = {
-          ...k,
-          ...inc,
-          id: k.id,
-          adopter: { ...k.adopter, ...(inc.adopter || {}) },
-          weighIns: sortWeighIns(Array.isArray(inc.weighIns) ? inc.weighIns : k.weighIns),
-          notesEntries: Array.isArray(inc.notesEntries) ? inc.notesEntries : (k.notesEntries || []),
-          adopterNotesEntries: Array.isArray(inc.adopterNotesEntries) ? inc.adopterNotesEntries : (k.adopterNotesEntries || []),
-        };
-
-        // backward compatibility for older saved data
-        normalizeLegacyNotes(next);
-
-        return next;
-      });
-
-      return merged;
-    };
-
-    const loadLocal = () => {
-      try{
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return deepClone(SEED);
-        return mergeIntoSeed(JSON.parse(raw));
-      } catch {
-        return deepClone(SEED);
-      }
-    };
-
-    const saveLocal = () => {
-      try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
-    };
+    const sortEntries = (es) => [...es].sort((a,b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 
     const ozToG = (oz) => oz * 28.349523125;
     const gToOz = (g) => g / 28.349523125;
@@ -596,7 +566,6 @@
     };
 
     const msSinceISOStart = (iso) => Date.now() - new Date(iso + "T00:00:00").getTime();
-
     const formatAge = (ms) => {
       const s = Math.max(0, Math.floor(ms/1000));
       const days = Math.floor(s/86400);
@@ -617,21 +586,65 @@
       return state.unit === "g" ? ozToG(w.oz) : w.oz;
     };
 
-    const ensureAdopter = (k) => {
-      if (!k.adopter) k.adopter = { name:"", email:"", phone:"" };
+    const ensureKittenShape = (k) => {
+      if (!k.adopter) k.adopter = { name:"", email:"", phone:"", notesEntries:[] };
+      if (!Array.isArray(k.adopter.notesEntries)) k.adopter.notesEntries = [];
       if (!Array.isArray(k.notesEntries)) k.notesEntries = [];
-      if (!Array.isArray(k.adopterNotesEntries)) k.adopterNotesEntries = [];
+      if (!Array.isArray(k.photos)) k.photos = [];
+      if (!Array.isArray(k.milestones)) k.milestones = [];
+      if (!Array.isArray(k.weighIns)) k.weighIns = [];
       return k;
     };
 
-    const latestWeighIn = (k) => {
-      const s = sortWeighIns(k.weighIns || []);
-      return s.length ? s[s.length-1] : null;
+    const ensureStateShape = (s) => {
+      if (!s || typeof s !== "object") return deepClone(SEED);
+      if (!Array.isArray(s.kittens)) s.kittens = deepClone(SEED.kittens);
+      if (!Array.isArray(s.litterMomPhotos)) s.litterMomPhotos = [];
+      s.kittens.forEach(ensureKittenShape);
+      return s;
     };
 
-    const prevWeighIn = (k) => {
-      const s = sortWeighIns(k.weighIns || []);
-      return s.length >= 2 ? s[s.length-2] : null;
+    const mergeIntoSeed = (incoming) => {
+      const merged = deepClone(SEED);
+      if (!incoming || typeof incoming !== "object") return merged;
+
+      merged.unit = incoming.unit === "g" ? "g" : "oz";
+      merged.litterBirthDateISO = incoming.litterBirthDateISO || merged.litterBirthDateISO;
+      merged.litterMomPhotos = Array.isArray(incoming.litterMomPhotos) ? incoming.litterMomPhotos : merged.litterMomPhotos;
+
+      const byId = new Map((incoming.kittens || []).map(k => [k.id, k]));
+      merged.kittens = merged.kittens.map(k => {
+        const inc = byId.get(k.id);
+        if (!inc) return ensureKittenShape(k);
+        const out = {
+          ...k,
+          ...inc,
+          id: k.id,
+          adopter: { ...k.adopter, ...(inc.adopter || {}) },
+          weighIns: sortWeighIns(Array.isArray(inc.weighIns) ? inc.weighIns : k.weighIns),
+          milestones: Array.isArray(inc.milestones) ? inc.milestones : (k.milestones || []),
+          notesEntries: Array.isArray(inc.notesEntries) ? inc.notesEntries : (k.notesEntries || []),
+          photos: Array.isArray(inc.photos) ? inc.photos : (k.photos || []),
+        };
+        out.adopter.notesEntries = Array.isArray(out.adopter.notesEntries) ? out.adopter.notesEntries : [];
+        return ensureKittenShape(out);
+      });
+
+      return ensureStateShape(merged);
+    };
+
+    const loadLocal = () => {
+      try{
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return deepClone(SEED);
+        return mergeIntoSeed(JSON.parse(raw));
+      } catch {
+        return deepClone(SEED);
+      }
+    };
+
+    const saveLocal = () => {
+      try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
     };
 
     const kittenMatches = (k, q) => {
@@ -654,40 +667,57 @@
       return `<span class="badge ${cls}">${escapeHtml(s)}</span>`;
     };
 
-    const canEdit = () => isAdmin === true;
+    const latestWeighIn = (k) => {
+      const s = sortWeighIns(k.weighIns || []);
+      return s.length ? s[s.length-1] : null;
+    };
+
+    const prevWeighIn = (k) => {
+      const s = sortWeighIns(k.weighIns || []);
+      return s.length >= 2 ? s[s.length-2] : null;
+    };
+
+    const nowISO = () => new Date().toISOString();
 
     /***********************
-     * SAVE STATUS + API SYNC
+     * ADMIN
      ***********************/
-    let saveStatus = "idle"; // idle|loading|synced|dirty|saving|error
-    let saveMsg = "";
+    const isAdmin = () => localStorage.getItem(ADMIN_KEY) === "1";
+    const setAdmin = (v) => localStorage.setItem(ADMIN_KEY, v ? "1" : "0");
+    const canEdit = () => isAdmin();
+
+    /***********************
+     * STATUS + SAVE (API)
+     ***********************/
+    let status = "idle"; // idle|loading|synced|dirty|saving|error
+    let statusMsg = "";
 
     const statusPill = document.getElementById("statusPill");
     const statusText = document.getElementById("statusText");
 
     const setStatus = (s, msg="") => {
-      saveStatus = s;
-      saveMsg = msg;
+      status = s;
+      statusMsg = msg;
       renderStatus();
     };
 
     const renderStatus = () => {
       const emoji =
-        saveStatus === "loading" ? "☁️" :
-        saveStatus === "saving"  ? "💾" :
-        saveStatus === "synced"  ? "✅" :
-        saveStatus === "dirty"   ? "🟡" :
-        saveStatus === "error"   ? "⚠️" : "✅";
+        status === "loading" ? "⏳" :
+        status === "saving"  ? "💾" :
+        status === "synced"  ? "✅" :
+        status === "dirty"   ? "🟡" :
+        status === "error"   ? "⚠️" : "✅";
 
       const label =
-        saveStatus === "loading" ? "Loading…" :
-        saveStatus === "saving"  ? "Saving…" :
-        saveStatus === "synced"  ? "Saved" :
-        saveStatus === "dirty"   ? "Not saved yet" :
-        saveStatus === "error"   ? "Save error" : "Saved";
+        status === "loading" ? "Loading…" :
+        status === "saving"  ? "Saving…" :
+        status === "synced"  ? "Saved" :
+        status === "dirty"   ? "Unsaved" :
+        status === "error"   ? "Error" : "Saved";
 
-      statusPill.setAttribute("data-status", saveStatus);
-      statusText.textContent = `${emoji} ${label}${saveMsg ? " • " + saveMsg : ""}`;
+      statusPill.setAttribute("data-status", status);
+      statusText.textContent = `${emoji} ${label}${statusMsg ? " • " + statusMsg : ""}`;
     };
 
     const safeJson = async (res) => {
@@ -711,19 +741,19 @@
         body
       });
       if (!res.ok) throw new Error(`POST failed: ${res.status}`);
-      // Some scripts return JSON; ignore if not.
-      try { await safeJson(res); } catch {}
+      // Some scripts return {ok:true}; ignore extra
+      await safeJson(res).catch(()=>{});
     };
 
     let saveTimer = null;
     const markDirtyAndScheduleSave = () => {
-      setStatus("dirty");
+      setStatus("dirty", "Will save");
       if (saveTimer) clearTimeout(saveTimer);
       saveTimer = setTimeout(async () => {
         try {
-          setStatus("saving");
+          setStatus("saving", "Saving…");
           await pushRemoteState(state);
-          setStatus("synced");
+          setStatus("synced", "Saved");
         } catch (e) {
           setStatus("error", e.message || "Save failed");
         }
@@ -731,11 +761,76 @@
     };
 
     /***********************
+     * DRIVE PHOTO UPLOAD
+     *
+     * IMPORTANT:
+     * This frontend sends NO token.
+     * Your Apps Script must NOT require a token for uploadPhoto.
+     * (Remove the token check there, or it will return Unauthorized.)
+     ***********************/
+    async function uploadPhotoToDrive({ kittenId, file }) {
+      const { base64, mimeType, filename } = await fileToCompressedBase64(file, 1200, 0.82);
+
+      const res = await fetch(BACKEND_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          action: "uploadPhoto",
+          kittenId,
+          filename,
+          mimeType,
+          base64
+        })
+      });
+
+      const data = await safeJson(res);
+      if (!res.ok || !data.ok) throw new Error(data.error || `Upload failed (${res.status})`);
+      return data; // { ok, fileId, url, name }
+    }
+
+    function fileToCompressedBase64(file, maxSizePx, quality) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        const reader = new FileReader();
+
+        reader.onload = () => {
+          img.onload = () => {
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+
+            const w = img.width;
+            const h = img.height;
+            const scale = Math.min(1, maxSizePx / Math.max(w, h));
+
+            canvas.width = Math.round(w * scale);
+            canvas.height = Math.round(h * scale);
+
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            const outMime = "image/jpeg";
+            const dataUrl = canvas.toDataURL(outMime, quality);
+
+            resolve({
+              base64: dataUrl,
+              mimeType: outMime,
+              filename: (file.name || "photo").replace(/\s+/g, "_")
+            });
+          };
+
+          img.onerror = () => reject(new Error("Could not load image"));
+          img.src = String(reader.result);
+        };
+
+        reader.onerror = () => reject(new Error("Could not read file"));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    /***********************
      * DOM
      ***********************/
     const bornDateEl = document.getElementById("bornDate");
     const ageTickerEl = document.getElementById("ageTicker");
-
     const unitSelect = document.getElementById("unitSelect");
     const allToggle = document.getElementById("allToggle");
     const kittensList = document.getElementById("kittensList");
@@ -743,14 +838,14 @@
     const selectedPanel = document.getElementById("selectedPanel");
     const selectedSub = document.getElementById("selectedSub");
     const selectedNamePill = document.getElementById("selectedNamePill");
-
     const addWeighBtn = document.getElementById("addWeighBtn");
-    const weightsTableWrap = document.getElementById("weightsTableWrap");
 
     const weighDialog = document.getElementById("weighDialog");
     const weighDate = document.getElementById("weighDate");
     const weighValue = document.getElementById("weighValue");
     const weighUnit = document.getElementById("weighUnit");
+
+    const adminBtn = document.getElementById("adminBtn");
 
     const tabButtons = Array.from(document.querySelectorAll(".tabbtn"));
     const wraps = {
@@ -761,13 +856,18 @@
       table: document.getElementById("wrap-table"),
     };
 
-    // Admin UI
-    const adminBtn = document.getElementById("adminBtn");
-    const adminDialog = document.getElementById("adminDialog");
-    const adminCodeInput = document.getElementById("adminCodeInput");
-    const adminUnlockBtn = document.getElementById("adminUnlockBtn");
-    const adminPill = document.getElementById("adminPill");
-    const adminText = document.getElementById("adminText");
+    const weightsTable = document.getElementById("weightsTable");
+
+    const litterPhotoFile = document.getElementById("litterPhotoFile");
+    const litterUploadBtn = document.getElementById("litterUploadBtn");
+    const litterGallery = document.getElementById("litterGallery");
+
+    const imgDialog = document.getElementById("imgDialog");
+    const imgDialogImg = document.getElementById("imgDialogImg");
+    const imgDialogTitle = document.getElementById("imgDialogTitle");
+    const imgDialogClose = document.getElementById("imgDialogClose");
+
+    imgDialogClose.addEventListener("click", () => imgDialog.close());
 
     /***********************
      * CHARTS
@@ -801,7 +901,6 @@
           const w = map.get(d);
           return w ? getVal(w) : null;
         });
-
         return {
           label: `${k.emoji || "🐾"} ${k.name}`,
           data: vals,
@@ -854,12 +953,11 @@
       const rows = state.kittens
         .map(k => {
           const last = latestWeighIn(k);
-          return { id: k.id, name: `${k.emoji || "🐾"} ${k.name}`, value: last ? getVal(last) : null };
+          return { id:k.id, name: `${k.emoji || "🐾"} ${k.name}`, value: last ? getVal(last) : null };
         })
         .sort((a,b) => (b.value ?? -Infinity) - (a.value ?? -Infinity));
 
       const colors = ["#ff8a3d","#db2777","#7c3aed","#0ea5e9","#10b981","#111827"];
-
       return {
         labels: rows.map(r => r.name),
         datasets: [{
@@ -873,29 +971,26 @@
     };
 
     const buildPieData = () => {
-      // Pie chart: share of latest weights (all kittens or selected)
-      const ks = getVisibleKittens();
-      const rows = ks.map(k => {
-        const last = latestWeighIn(k);
-        return { name: `${k.emoji || "🐾"} ${k.name}`, value: last ? getVal(last) : 0 };
-      }).filter(r => (r.value ?? 0) > 0);
-
-      const colors = rows.map(r => {
-        const id = state.kittens.find(k => `${k.emoji || "🐾"} ${k.name}` === r.name)?.id;
-        return palette[id] || "#111827";
+      // Pie = status breakdown (Available/Reserved/Adopted)
+      const counts = { Available:0, Reserved:0, Adopted:0 };
+      state.kittens.forEach(k => {
+        const s = (k.status || "Available");
+        if (counts[s] == null) counts[s] = 0;
+        counts[s] += 1;
       });
 
       return {
-        labels: rows.map(r => r.name),
+        labels: ["Available","Reserved","Adopted"],
         datasets: [{
-          label: `Share of latest weights`,
-          data: rows.map(r => r.value),
-          backgroundColor: colors
+          label: "Status",
+          data: [counts.Available, counts.Reserved, counts.Adopted],
+          // chart.js default colors are fine; keep simple
         }],
+        yLabel: ""
       };
     };
 
-    const makeChart = (canvas, type, dataBuilder, yLabelOpt=null) => {
+    const makeChart = (canvas, type, dataBuilder, opts={}) => {
       const built = dataBuilder();
       return new Chart(canvas, {
         type,
@@ -910,21 +1005,16 @@
                 label: (item) => {
                   const v = item.raw;
                   if (v == null) return `${item.dataset.label}: —`;
+                  if (type === "pie") return `${item.label}: ${v}`;
                   const digits = state.unit === "g" ? 1 : 3;
-                  if (type === "pie") {
-                    const total = item.dataset.data.reduce((a,b) => a + (Number(b)||0), 0) || 1;
-                    const pct = (Number(v) / total) * 100;
-                    return `${item.label}: ${fmt(v, digits)} ${state.unit} (${fmt(pct, 1)}%)`;
-                  }
-                  const suffix = yLabelOpt ? "" : state.unit;
-                  return `${item.dataset.label}: ${fmt(v, digits)} ${suffix}`.trim();
+                  return `${item.dataset.label}: ${fmt(v, digits)} ${state.unit}`;
                 }
               }
             }
           },
-          scales: (type === "pie") ? {} : {
+          scales: opts.noScales ? {} : {
             x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }, grid: { color: "rgba(31,36,48,.06)" } },
-            y: { title: { display: true, text: yLabelOpt || built.yLabel || "", font: { family: "Nunito", weight: "700" } }, grid: { color: "rgba(31,36,48,.06)" } }
+            y: { title: { display: true, text: built.yLabel, font: { family: "Nunito", weight: "700" } }, grid: { color: "rgba(31,36,48,.06)" } }
           }
         }
       });
@@ -939,13 +1029,13 @@
       chartGrowth = makeChart(document.getElementById("chartGrowth"), "line", buildGrowthData);
       chartLatest = makeChart(document.getElementById("chartLatest"), "bar", buildLatestData);
       chartAvg = makeChart(document.getElementById("chartAvg"), "line", buildAvgData);
-      chartPie = makeChart(document.getElementById("chartPie"), "pie", buildPieData, null);
+      chartPie = makeChart(document.getElementById("chartPie"), "pie", buildPieData, { noScales:true });
 
       renderWeightsTable();
     };
 
     /***********************
-     * TABLE VIEW (all weights by date)
+     * TABLE VIEW
      ***********************/
     const renderWeightsTable = () => {
       const dates = allDates();
@@ -953,30 +1043,35 @@
 
       const digits = state.unit === "g" ? 1 : 3;
 
-      const header = `
-        <table>
-          <thead>
-            <tr>
-              <th style="min-width: 140px;">Date</th>
-              <th style="min-width: 110px;">Age (days)</th>
-              ${kittens.map(k => `<th style="min-width: 140px;">${escapeHtml((k.emoji||"🐾") + " " + k.name)}</th>`).join("")}
-            </tr>
-          </thead>
-          <tbody>
-            ${dates.map(d => {
-              const age = Math.max(0, dayDiffISO(state.litterBirthDateISO, d));
-              const cells = kittens.map(k => {
-                const w = (k.weighIns||[]).find(x => x.date === d);
-                const v = w ? getVal(w) : null;
-                return `<td>${v == null ? "" : `${fmt(v, digits)} ${state.unit}`}</td>`;
-              }).join("");
-              return `<tr><td>${escapeHtml(d)}</td><td>${age}</td>${cells}</tr>`;
-            }).join("")}
-          </tbody>
-        </table>
+      const thead = `
+        <thead>
+          <tr>
+            <th style="min-width:140px;">Date</th>
+            ${kittens.map(k => `<th style="min-width:120px;">${escapeHtml(k.name)}</th>`).join("")}
+            <th class="right" style="min-width:120px;">Avg</th>
+          </tr>
+        </thead>
       `;
 
-      weightsTableWrap.innerHTML = header;
+      const tbodyRows = dates.map(d => {
+        const vals = kittens.map(k => {
+          const w = (k.weighIns || []).find(x => x.date === d);
+          const v = w ? getVal(w) : null;
+          return { v, text: v == null ? "—" : `${fmt(v, digits)}` };
+        });
+        const present = vals.map(x => x.v).filter(v => v != null);
+        const avg = present.length ? (present.reduce((a,b)=>a+b,0)/present.length) : null;
+
+        return `
+          <tr>
+            <td>${escapeHtml(d)}</td>
+            ${vals.map(x => `<td>${escapeHtml(x.text)}</td>`).join("")}
+            <td class="right">${avg == null ? "—" : fmt(avg, digits)}</td>
+          </tr>
+        `;
+      }).join("");
+
+      weightsTable.innerHTML = thead + `<tbody>${tbodyRows || ""}</tbody>`;
     };
 
     /***********************
@@ -987,7 +1082,7 @@
       const list = state.kittens.filter(k => kittenMatches(k, q));
 
       kittensList.innerHTML = list.map(k => {
-        ensureAdopter(k);
+        ensureKittenShape(k);
         const last = latestWeighIn(k);
         const prev = prevWeighIn(k);
         const lastV = last ? getVal(last) : null;
@@ -1010,7 +1105,7 @@
                 </div>
               </div>
             </div>
-            <div style="text-align:right; min-width: 120px;">
+            <div style="text-align:right; min-width: 130px;">
               <div>${statusBadge(k.status)}</div>
               <div class="kmeta" style="margin-top:4px;">
                 ${last ? `${fmt(lastV, digits)} ${state.unit}` : "—"}
@@ -1029,38 +1124,68 @@
       });
     };
 
-    const renderNoteList = (entries, kind, allowDelete) => {
-      const list = sortEntriesDesc(entries || []);
-      if (!list.length) return `<div class="small">No saved ${kind} yet.</div>`;
+    const renderGallery = ({ photos, containerEl, titlePrefix, allowDelete, onDelete, onView }) => {
+      const items = Array.isArray(photos) ? photos : [];
+      containerEl.innerHTML = items.map((p, idx) => {
+        const url = escapeHtml(p.url || "");
+        return `
+          <div class="thumb" data-idx="${idx}" title="Open">
+            <img src="${url}" alt="Photo">
+            ${allowDelete ? `<div class="x" data-x="${idx}" title="Remove">✖</div>` : ""}
+          </div>
+        `;
+      }).join("") || `<div class="small">No photos yet.</div>`;
 
-      return `
-        <div class="noteList">
-          ${list.map((e, idx) => `
-            <div class="noteItem">
-              <div class="d">
-                <div>${escapeHtml(e.dateISO || "—")}</div>
-                ${allowDelete ? `<button class="btn" data-del-note="${escapeHtml(kind)}:${idx}" title="Delete">🗑️</button>` : `<span class="soft">saved</span>`}
-              </div>
-              <div class="t">${escapeHtml(e.text || "")}</div>
-            </div>
-          `).join("")}
-        </div>
-      `;
+      containerEl.querySelectorAll(".thumb").forEach(el => {
+        const idx = Number(el.getAttribute("data-idx"));
+        el.addEventListener("click", (ev) => {
+          const x = ev.target?.getAttribute?.("data-x");
+          if (x != null) return; // delete button clicked
+          const p = items[idx];
+          if (!p) return;
+          onView(p, idx);
+        });
+      });
+
+      if (allowDelete) {
+        containerEl.querySelectorAll("[data-x]").forEach(btn => {
+          btn.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            const idx = Number(btn.getAttribute("data-x"));
+            if (Number.isFinite(idx)) onDelete(idx);
+          });
+        });
+      }
+    };
+
+    const renderEntries = (entries) => {
+      const items = sortEntries(Array.isArray(entries) ? entries : []);
+      if (!items.length) return `<div class="small">No saved notes yet.</div>`;
+      return items.map(e => {
+        const when = new Date(e.createdAt);
+        const label = isNaN(when.getTime()) ? escapeHtml(e.createdAt) : when.toLocaleString();
+        return `
+          <div style="border:1px solid rgba(31,36,48,.10);border-radius:16px;background:rgba(255,255,255,.65);padding:10px 12px;margin-top:8px;">
+            <div class="small" style="margin:0;font-weight:900;">${escapeHtml(label)}</div>
+            <div style="margin-top:6px;white-space:pre-wrap;">${escapeHtml(e.text || "")}</div>
+          </div>
+        `;
+      }).join("");
     };
 
     const renderSelected = () => {
       const k = state.kittens.find(x => x.id === selectedId) || state.kittens[0];
-      ensureAdopter(k);
+      ensureKittenShape(k);
 
       selectedNamePill.textContent = `${k.emoji || "🐾"} ${k.name}`;
       selectedSub.textContent = `${k.tag || ""}${k.description ? " • " + k.description : ""}`.trim() || "—";
+
+      const digits = state.unit === "g" ? 1 : 3;
 
       const last = latestWeighIn(k);
       const prev = prevWeighIn(k);
       const lastV = last ? getVal(last) : null;
       const prevV = prev ? getVal(prev) : null;
-
-      const digits = state.unit === "g" ? 1 : 3;
 
       const ageDays = last ? Math.max(0, dayDiffISO(state.litterBirthDateISO, last.date)) : null;
       const delta = (last && prev) ? (lastV - prevV) : null;
@@ -1068,7 +1193,6 @@
       const deltaPerDay = (delta != null && daysBetween != null) ? (delta / daysBetween) : null;
 
       const adopterEnabled = (k.status === "Reserved" || k.status === "Adopted");
-      const editing = canEdit();
 
       const weighRows = sortWeighIns(k.weighIns || []).map(w => {
         const v = getVal(w);
@@ -1078,12 +1202,14 @@
             <td>${escapeHtml(w.date)}</td>
             <td>${ad}</td>
             <td>${fmt(v, digits)} ${state.unit}</td>
-            <td style="text-align:right;">
-              <button class="btn" data-del="${escapeHtml(w.date)}" title="Delete weigh-in" ${editing ? "" : "disabled"}>🗑️</button>
+            <td class="right">
+              <button class="btn" data-del="${escapeHtml(w.date)}" title="Delete weigh-in" ${canEdit() ? "" : "disabled"}>🗑️</button>
             </td>
           </tr>
         `;
       }).join("");
+
+      const editing = canEdit();
 
       selectedPanel.innerHTML = `
         <div class="kheader">
@@ -1110,10 +1236,7 @@
         <div class="two" style="margin-top: 14px;">
           <div class="card" style="box-shadow:none; background: rgba(255,255,255,.55);">
             <div class="head" style="border-bottom:none;">
-              <div>
-                <h2>Profile</h2>
-                <div class="small">${editing ? "Editing enabled" : "Locked (admin only)"}</div>
-              </div>
+              <div><h2>Profile</h2><div class="small">Name / emoji / status</div></div>
             </div>
             <div class="body">
               <div class="two">
@@ -1150,13 +1273,12 @@
 
           <div class="card" style="box-shadow:none; background: rgba(255,255,255,.55);">
             <div class="head" style="border-bottom:none;">
-              <div>
-                <h2>Adopter</h2>
-                <div class="small">${adopterEnabled ? "Enabled (Reserved/Adopted)" : "Set status to Reserved/Adopted to enable"}</div>
-              </div>
+              <div><h2>Adopter</h2><div class="small">Enabled by setting status to Reserved or Adopted</div></div>
             </div>
             <div class="body">
-              <div class="two">
+              <div class="small">${adopterEnabled ? "Adopter details enabled." : "Set status to Reserved or Adopted to enable adopter details."}</div>
+
+              <div class="two" style="margin-top: 10px;">
                 <div>
                   <label>Adopter name</label>
                   <input id="a_name" value="${escapeHtml(k.adopter.name || "")}" ${(editing && adopterEnabled) ? "" : "disabled"} />
@@ -1173,15 +1295,15 @@
 
               <div style="margin-top: 12px;">
                 <label>Add adopter note</label>
-                <textarea id="a_note_new" placeholder="Meetup preferences, home notes, gotcha-day plan…" ${(editing && adopterEnabled) ? "" : "disabled"}></textarea>
-                <div style="margin-top: 10px; display:flex; justify-content:flex-end;">
-                  <button class="btn pink" id="addAdopterNoteBtn" ${(editing && adopterEnabled) ? "" : "disabled"}>📝 Save adopter note</button>
+                <textarea id="a_note_new" ${(editing && adopterEnabled) ? "" : "disabled"} placeholder="Add a note (saved with date)…"></textarea>
+                <div style="margin-top: 10px; display:flex; justify-content:flex-end; gap:10px;">
+                  <button class="btn pink" id="addAdopterNoteBtn" ${(editing && adopterEnabled) ? "" : "disabled"}>➕ Save note</button>
                 </div>
-                ${renderNoteList(k.adopterNotesEntries, "adopter", editing && adopterEnabled)}
               </div>
 
-              <div style="margin-top: 12px; display:flex; justify-content:flex-end;">
-                <button class="btn pink" id="saveAdopterBtn" ${(editing && adopterEnabled) ? "" : "disabled"}>💖 Save adopter</button>
+              <div style="margin-top: 12px;">
+                <label>Saved adopter notes</label>
+                <div id="a_notes_list">${renderEntries(k.adopter.notesEntries)}</div>
               </div>
             </div>
           </div>
@@ -1193,29 +1315,57 @@
             <div class="body">
               <table>
                 <thead>
-                  <tr><th style="width: 30%">Date</th><th style="width: 18%">Age (days)</th><th>Weight</th><th style="text-align:right; width: 90px;">Action</th></tr>
+                  <tr><th style="width: 30%">Date</th><th style="width: 18%">Age (days)</th><th>Weight</th><th class="right" style="width: 110px;">Action</th></tr>
                 </thead>
                 <tbody>
                   ${weighRows || '<tr><td colspan="4" class="kmeta">No weigh-ins yet.</td></tr>'}
                 </tbody>
               </table>
-              <div class="small" style="margin-top: 8px;">${editing ? "Use “Add weigh-in” above the charts." : "Admin unlock required to add/delete weigh-ins."}</div>
+              <div class="small" style="margin-top: 8px;">Tip: Use “Add weigh-in” above (admin).</div>
             </div>
           </div>
 
           <div class="card" style="box-shadow:none; background: rgba(255,255,255,.55);">
-            <div class="head" style="border-bottom:none;"><div><h2>Notes</h2><div class="small">Saved notes show below by date</div></div></div>
+            <div class="head" style="border-bottom:none;"><div><h2>Notes</h2><div class="small">Saved with date</div></div></div>
             <div class="body">
               <label>Add note</label>
-              <textarea id="k_note_new" placeholder="Personality, feeding notes, meds, litter training…" ${editing ? "" : "disabled"}></textarea>
+              <textarea id="k_note_new" ${editing ? "" : "disabled"} placeholder="Add a note (saved with date)…"></textarea>
               <div style="margin-top: 10px; display:flex; justify-content:flex-end;">
-                <button class="btn pink" id="addNoteBtn" ${editing ? "" : "disabled"}>📝 Save note</button>
+                <button class="btn pink" id="addKittenNoteBtn" ${editing ? "" : "disabled"}>➕ Save note</button>
               </div>
-              ${renderNoteList(k.notesEntries, "kitten", editing)}
+
+              <div style="margin-top: 12px;">
+                <label>Saved notes</label>
+                <div id="k_notes_list">${renderEntries(k.notesEntries)}</div>
+              </div>
             </div>
           </div>
         </div>
+
+        <div class="card" style="box-shadow:none; background: rgba(255,255,255,.55); margin-top: 14px;">
+          <div class="head" style="border-bottom:none;">
+            <div><h2>Photo gallery</h2><div class="small">Photos for ${escapeHtml(k.name)}</div></div>
+            <div class="row" style="justify-content:flex-end;">
+              <input id="k_photoFile" type="file" accept="image/*" style="max-width:260px;" />
+              <button class="btn pink" id="k_uploadPhotoBtn">📸 Add photo</button>
+            </div>
+          </div>
+          <div class="body">
+            <div id="k_gallery" class="gallery"></div>
+            <div class="small" style="margin-top:8px;">(Admin unlock required to add or delete.)</div>
+          </div>
+        </div>
       `;
+
+      // Focus controls
+      document.getElementById("focusOnlyBtn").addEventListener("click", () => {
+        allToggle.checked = false;
+        rebuildCharts();
+      });
+      document.getElementById("showAllBtn").addEventListener("click", () => {
+        allToggle.checked = true;
+        rebuildCharts();
+      });
 
       // Delete weigh-in
       selectedPanel.querySelectorAll("[data-del]").forEach(btn => {
@@ -1232,89 +1382,50 @@
         });
       });
 
-      // Delete note/adopter note (index in rendered list, so we re-derive list order)
-      selectedPanel.querySelectorAll("[data-del-note]").forEach(btn => {
-        btn.addEventListener("click", () => {
-          if (!canEdit()) return;
-          const key = btn.getAttribute("data-del-note") || "";
-          const [kind, idxStr] = key.split(":");
-          const idx = Number(idxStr);
-          if (!Number.isFinite(idx)) return;
-
-          if (kind === "kitten") {
-            const ordered = sortEntriesDesc(k.notesEntries);
-            const target = ordered[idx];
-            if (!target) return;
-            if (confirm(`Delete note from ${target.dateISO}?`)) {
-              // remove by identity (date+text match)
-              k.notesEntries = (k.notesEntries||[]).filter(e => !(e.dateISO === target.dateISO && e.text === target.text));
-              saveLocal();
-              markDirtyAndScheduleSave();
-              renderAll(false);
-            }
-          }
-
-          if (kind === "adopter") {
-            if (!(k.status === "Reserved" || k.status === "Adopted")) return;
-            const ordered = sortEntriesDesc(k.adopterNotesEntries);
-            const target = ordered[idx];
-            if (!target) return;
-            if (confirm(`Delete adopter note from ${target.dateISO}?`)) {
-              k.adopterNotesEntries = (k.adopterNotesEntries||[]).filter(e => !(e.dateISO === target.dateISO && e.text === target.text));
-              saveLocal();
-              markDirtyAndScheduleSave();
-              renderAll(false);
-            }
-          }
-        });
-      });
-
-      document.getElementById("focusOnlyBtn").addEventListener("click", () => {
-        allToggle.checked = false;
-        rebuildCharts();
-      });
-      document.getElementById("showAllBtn").addEventListener("click", () => {
-        allToggle.checked = true;
-        rebuildCharts();
-      });
-
+      // Save profile
       document.getElementById("saveProfileBtn").addEventListener("click", () => {
         if (!canEdit()) return;
-
         k.name = document.getElementById("k_name").value.trim() || k.name;
         k.emoji = document.getElementById("k_emoji").value.trim() || k.emoji;
         k.status = document.getElementById("k_status").value;
         k.tag = document.getElementById("k_tag").value.trim();
         k.description = document.getElementById("k_desc").value;
-        ensureAdopter(k);
 
         saveLocal();
         markDirtyAndScheduleSave();
         renderAll();
       });
 
-      document.getElementById("saveAdopterBtn").addEventListener("click", () => {
-        if (!canEdit()) return;
-        if (!(k.status === "Reserved" || k.status === "Adopted")) return;
-
-        ensureAdopter(k);
+      // Save adopter basics (kept minimal: update fields when leaving input via note add, too)
+      const writeAdopterBasics = () => {
+        ensureKittenShape(k);
         k.adopter.name  = document.getElementById("a_name").value;
         k.adopter.email = document.getElementById("a_email").value;
         k.adopter.phone = document.getElementById("a_phone").value;
+      };
+
+      // Add adopter note (dated)
+      document.getElementById("addAdopterNoteBtn").addEventListener("click", () => {
+        if (!canEdit() || !adopterEnabled) return;
+        writeAdopterBasics();
+        const t = (document.getElementById("a_note_new").value || "").trim();
+        if (!t) return;
+
+        k.adopter.notesEntries.unshift({ createdAt: nowISO(), text: t });
+        document.getElementById("a_note_new").value = "";
 
         saveLocal();
         markDirtyAndScheduleSave();
         renderAll(false);
       });
 
-      document.getElementById("addNoteBtn").addEventListener("click", () => {
+      // Add kitten note (dated)
+      document.getElementById("addKittenNoteBtn").addEventListener("click", () => {
         if (!canEdit()) return;
-        const text = document.getElementById("k_note_new").value.trim();
-        if (!text) return;
+        const t = (document.getElementById("k_note_new").value || "").trim();
+        if (!t) return;
 
-        k.notesEntries = k.notesEntries || [];
-        k.notesEntries.unshift({ dateISO: todayISO(), text });
-
+        k.notesEntries.unshift({ createdAt: nowISO(), text: t });
         document.getElementById("k_note_new").value = "";
 
         saveLocal();
@@ -1322,39 +1433,89 @@
         renderAll(false);
       });
 
-      const addAdopterNoteBtn = document.getElementById("addAdopterNoteBtn");
-      if (addAdopterNoteBtn) {
-        addAdopterNoteBtn.addEventListener("click", () => {
+      // Kitten gallery
+      const kFile = document.getElementById("k_photoFile");
+      const kUpload = document.getElementById("k_uploadPhotoBtn");
+      const kGallery = document.getElementById("k_gallery");
+
+      kFile.disabled = !canEdit();
+      kUpload.disabled = !canEdit();
+
+      renderGallery({
+        photos: k.photos,
+        containerEl: kGallery,
+        titlePrefix: k.name,
+        allowDelete: canEdit(),
+        onDelete: (idx) => {
           if (!canEdit()) return;
-          if (!(k.status === "Reserved" || k.status === "Adopted")) return;
-
-          const text = document.getElementById("a_note_new").value.trim();
-          if (!text) return;
-
-          k.adopterNotesEntries = k.adopterNotesEntries || [];
-          k.adopterNotesEntries.unshift({ dateISO: todayISO(), text });
-
-          document.getElementById("a_note_new").value = "";
-
+          if (!confirm("Remove this photo from the gallery?")) return;
+          k.photos.splice(idx, 1);
           saveLocal();
           markDirtyAndScheduleSave();
           renderAll(false);
-        });
-      }
+        },
+        onView: (p) => {
+          imgDialogTitle.textContent = `${k.name} • Photo`;
+          imgDialogImg.src = p.url;
+          imgDialog.showModal();
+        }
+      });
+
+      kUpload.addEventListener("click", async () => {
+        if (!canEdit()) return;
+        const f = kFile.files?.[0];
+        if (!f) { alert("Choose a photo first."); return; }
+        try {
+          setStatus("saving", "Uploading photo…");
+          const out = await uploadPhotoToDrive({ kittenId: k.id, file: f });
+          k.photos.unshift({ url: out.url, fileId: out.fileId || "", addedAt: nowISO() });
+          saveLocal();
+          markDirtyAndScheduleSave();
+          renderAll(false);
+          setStatus("synced", "Saved");
+        } catch (e) {
+          setStatus("error", "Upload failed");
+          alert(String(e?.message || e));
+        } finally {
+          kFile.value = "";
+        }
+      });
     };
 
-    const renderAdminUI = () => {
-      adminPill.setAttribute("data-status", isAdmin ? "synced" : "idle");
-      adminText.textContent = isAdmin ? "🔓 Unlocked" : "🔒 Locked";
-      addWeighBtn.disabled = !canEdit();
+    const renderLitterGallery = () => {
+      litterPhotoFile.disabled = !canEdit();
+      litterUploadBtn.disabled = !canEdit();
+
+      renderGallery({
+        photos: state.litterMomPhotos,
+        containerEl: litterGallery,
+        titlePrefix: "Litter & Mom",
+        allowDelete: canEdit(),
+        onDelete: (idx) => {
+          if (!canEdit()) return;
+          if (!confirm("Remove this photo from the Litter & Mom gallery?")) return;
+          state.litterMomPhotos.splice(idx, 1);
+          saveLocal();
+          markDirtyAndScheduleSave();
+          renderAll(false);
+        },
+        onView: (p) => {
+          imgDialogTitle.textContent = `Litter & Mom • Photo`;
+          imgDialogImg.src = p.url;
+          imgDialog.showModal();
+        }
+      });
     };
 
     const renderAll = (rebuild=true) => {
       unitSelect.value = state.unit;
       bornDateEl.textContent = state.litterBirthDateISO;
-      renderAdminUI();
+
+      adminBtn.textContent = isAdmin() ? "🔓 Admin" : "🔒 Admin";
+
       renderRoster();
       renderSelected();
+      renderLitterGallery();
       if (rebuild) rebuildCharts();
     };
 
@@ -1378,16 +1539,35 @@
         Object.entries(wraps).forEach(([k, el]) => {
           if (el) el.style.display = (k === tab) ? "" : "none";
         });
+        if (tab === "table") renderWeightsTable();
       });
     });
 
-    addWeighBtn.addEventListener("click", () => {
-      if (!canEdit()) {
-        alert("Admin unlock required to add weigh-ins.");
+    // Admin unlock
+    adminBtn.addEventListener("click", () => {
+      if (isAdmin()) {
+        if (confirm("Lock admin mode?")) {
+          setAdmin(false);
+          renderAll(false);
+        }
         return;
       }
+      const code = prompt("Enter admin code:");
+      if (code === null) return;
+      if (String(code).trim() === ADMIN_CODE) {
+        setAdmin(true);
+        renderAll(false);
+      } else {
+        alert("Incorrect code.");
+      }
+    });
+
+    // Add weigh-in (admin)
+    addWeighBtn.addEventListener("click", () => {
+      if (!canEdit()) { alert("Admin unlock required."); return; }
       const k = state.kittens.find(x => x.id === selectedId);
       if (!k) return;
+
       weighUnit.textContent = state.unit;
       weighValue.value = "";
 
@@ -1431,23 +1611,25 @@
       renderAll();
     });
 
-    // Admin unlock
-    let isAdmin = false;
+    // Litter & Mom upload
+    litterUploadBtn.addEventListener("click", async () => {
+      if (!canEdit()) { alert("Admin unlock required."); return; }
+      const f = litterPhotoFile.files?.[0];
+      if (!f) { alert("Choose a photo first."); return; }
+      try {
+        setStatus("saving", "Uploading photo…");
+        const out = await uploadPhotoToDrive({ kittenId: "litter_mom", file: f });
+        state.litterMomPhotos.unshift({ url: out.url, fileId: out.fileId || "", addedAt: nowISO() });
 
-    adminBtn.addEventListener("click", () => {
-      adminCodeInput.value = "";
-      adminDialog.showModal();
-    });
-
-    adminUnlockBtn.addEventListener("click", (ev) => {
-      ev.preventDefault();
-      const code = (adminCodeInput.value || "").trim();
-      if (code === ADMIN_CODE) {
-        isAdmin = true;
-        adminDialog.close();
+        saveLocal();
+        markDirtyAndScheduleSave();
         renderAll(false);
-      } else {
-        alert("Incorrect admin code.");
+        setStatus("synced", "Saved");
+      } catch (e) {
+        setStatus("error", "Upload failed");
+        alert(String(e?.message || e));
+      } finally {
+        litterPhotoFile.value = "";
       }
     });
 
@@ -1463,18 +1645,8 @@
      * INIT
      ***********************/
     let state = loadLocal();
+    state = ensureStateShape(state);
     let selectedId = state.kittens[0]?.id || "orange";
-
-    const runSelfTests = () => {
-      const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
-      assert(SEED.kittens.length === 6, "Expected 6 kittens in seed data");
-      const oz = 10;
-      const g = ozToG(oz);
-      const oz2 = gToOz(g);
-      assert(Math.abs(oz2 - oz) < 1e-9, "Expected gToOz(ozToG(x))≈x");
-      assert(dayDiffISO("2026-01-01","2026-01-05") === 4, "Expected 4 day difference");
-      console.info("Kitten tracker self-tests passed ✅");
-    };
 
     const init = async () => {
       renderStatus();
@@ -1483,22 +1655,22 @@
       tickAge();
       setInterval(tickAge, 1000);
 
-      // Load from API
+      // Load shared state from backend
       try {
-        setStatus("loading");
+        setStatus("loading", "Loading…");
         const remote = await fetchRemoteState();
         if (remote) {
           state = mergeIntoSeed(remote);
           saveLocal();
+          setStatus("synced", "Loaded");
+        } else {
+          setStatus("synced", "Ready");
         }
-        setStatus("synced");
       } catch (e) {
-        // Keep local if API is unavailable
-        setStatus("error", "Using local");
+        setStatus("error", "Offline");
       }
 
       renderAll();
-      runSelfTests();
     };
 
     init();
