@@ -1829,6 +1829,7 @@
       } catch (e) {
         setStatus("error", "Offline");
       }
+document.getElementById("selectedDetails")?.removeAttribute("open");
 
       renderAll();
     };
